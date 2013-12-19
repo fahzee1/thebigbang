@@ -8,6 +8,8 @@ from tastypie.http import HttpUnauthorized, HttpForbidden
 from django.conf.urls import url
 from tastypie.utils import trailing_slash
 from tastypie import fields
+from tastypie.serializers import Serializer
+from tastypie.models import ApiKey
 import pdb
 
 
@@ -16,12 +18,13 @@ class UserResource(ModelResource):
 		queryset = User.objects.all()
 		resource_name = 'user'
 		excludes = ['email', 'password', 'is_active', 'is_staff', 'is_superuser']
-		list_allowed_methods = ['get','post']
+		allowed_methods = ['get','post']
 		authorization = DjangoAuthorization()
 		authentication = BasicAuthentication()
 
-		def override_urls(self):
-			return [
+
+	def prepend_urls(self):
+		return [
 	            url(r"^(?P<resource_name>%s)/login%s$" %
 	                (self._meta.resource_name, trailing_slash()),
 	                self.wrap_view('login'), name="api_login"),
@@ -29,39 +32,40 @@ class UserResource(ModelResource):
 	                (self._meta.resource_name, trailing_slash()),
 	                self.wrap_view('logout'), name='api_logout')]
 
-		def login(self, request, **kwargs):
-			pdb.set_trace()
-			self.method_check(request, allowed=['post'])
-			data = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
-			username = data.get('username', '')
-			password = data.get('password', '')
-			print username
 
-			user = authenticate(username=username, password=password)
-			if user:
-				if user.is_active:
-					login(request, user)
-					return self.create_response(request, {
-	                    'success': True
+	def login(self, request, **kwargs):
+		self.method_check(request, allowed=['post'])
+		
+		data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
+		username = data.get('username', '')
+		password = data.get('password', '')
+
+
+		user = authenticate(username=username, password=password)
+		if user:
+			if user.is_active:
+				login(request, user)
+				return self.create_response(request, {
+	                   'success': 1
 	                })
-				else:
-					return self.create_response(request, {
-	                    'success': False,
-	                    'reason': 'disabled',
-	                    }, HttpForbidden )
 			else:
 				return self.create_response(request, {
-	                'success': False,
+	                   'success': 0,
+	                   'reason': 'disabled',
+	                    }, HttpForbidden )
+		else:
+			return self.create_response(request, {
+	                'success': 0,
 	                'reason': 'incorrect',
 	                }, HttpUnauthorized )
 
-		def logout(self, request, **kwargs):
-			self.method_check(request, allowed=['get'])
-			if request.user and request.user.is_authenticated():
-				logout(request)
-				return self.create_response(request, { 'success': True })
-			else:
-				return self.create_response(request, { 'success': False }, HttpUnauthorized)
+	def logout(self, request, **kwargs):
+		self.method_check(request, allowed=['get'])
+		if request.user and request.user.is_authenticated():
+			logout(request)
+			return self.create_response(request, { 'success': True })
+		else:
+			return self.create_response(request, { 'success': False }, HttpUnauthorized)
 
 class EntryResource(ModelResource):
 	user = fields.ForeignKey(UserResource, 'user'
