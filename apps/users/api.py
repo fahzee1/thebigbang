@@ -1,8 +1,8 @@
 from tastypie.resources import ModelResource
 from models import Entry
-from tastypie.authorization import DjangoAuthorization
+from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
-from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication
+from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication, Authentication
 from django.contrib.auth import authenticate, login, logout
 from tastypie.http import HttpUnauthorized, HttpForbidden , HttpBadRequest
 from django.http import HttpResponseBadRequest, HttpResponse
@@ -103,11 +103,12 @@ class RegisterUserResource(ModelResource):
 		allowed_methods = ['post']
 		include_resource_uri = False
 		always_return_data = True
-		authorization = DjangoAuthorization()
-		authentication = BasicAuthentication()
+		authorization = Authorization()
+		authentication = Authentication()
 
 
 	def obj_create(self, bundle, request=None, **kwargs):
+		#pdb.set_trace()
 		username, email, password = bundle.data['username'], bundle.data['email'], bundle.data['password']
 		try:
 			bundle.obj = User.objects.create_user(username, email, password)
@@ -123,7 +124,7 @@ class RegisterUserResource(ModelResource):
 				# TODO figure out what i need to do here
 				pass
 		except IntegrityError:
-			raise Exception('Username exists')
+			return self.create_response(bundle.request,{'success':0,'reason':'already_exists'})
 		return bundle
 
 
