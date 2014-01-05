@@ -3,11 +3,10 @@ from django.conf.urls import patterns, include, url
 from django.contrib import admin
 admin.autodiscover()
 from tastypie.api import Api
-from apps.users.api import EntryResource, LoginUserResource, RegisterUserResource
+from apps.users.api import UserResource, RegisterUserResource
 
 v1_api = Api(api_name="v1")
-v1_api.register(LoginUserResource())
-v1_api.register(EntryResource())
+v1_api.register(UserResource())
 v1_api.register(RegisterUserResource())
 
 

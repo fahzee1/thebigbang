@@ -1,5 +1,4 @@
 from tastypie.resources import ModelResource
-from models import Entry
 from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
 from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication, Authentication
@@ -14,11 +13,29 @@ from tastypie.models import ApiKey
 from django.db import IntegrityError
 import pdb
 
-
-class LoginUserResource(ModelResource):
+responder = {}
+class UserResource(ModelResource):
 	"""
-	Logs users in, overrides default urls to add
-	/login and /logout urls.
+	Login:
+	POST to /api/v1/user/login
+	{"username":"user",
+	"password":"pword}
+
+	Logout:
+	GET to /api/v1/user/logout
+	no params
+
+	Update Settings:
+	POST to /api/v1/user/settings
+	action params:
+		-updateEmail
+		-updateUsername
+		-updatePhoneNumber
+
+	{"username":"user"
+	 "action":"updateEmail,
+	 "content":"test@email.com"}
+
 	"""
 	class Meta:
 		queryset = User.objects.all()
@@ -26,7 +43,7 @@ class LoginUserResource(ModelResource):
 		fields = ['username','email']
 		allowed_methods = ['get','post']
 		authorization = DjangoAuthorization()
-		authentication = MultiAuthentication(ApiKeyAuthentication(), BasicAuthentication())
+		authentication = ApiKeyAuthentication()
 
 
 	def prepend_urls(self):
@@ -40,6 +57,9 @@ class LoginUserResource(ModelResource):
 	            url(r'^(?P<resource_name>%s)/signup%s$' %
 	                (self._meta.resource_name, trailing_slash()),
 	                self.wrap_view('logout'), name='api_logout'),
+	            url(r'^(?P<resource_name>%s)/settings%s$' %
+	                (self._meta.resource_name, trailing_slash()),
+	                self.wrap_view('settings'), name='api_settings'),
 	            ]
 
 
@@ -47,8 +67,8 @@ class LoginUserResource(ModelResource):
 		self.method_check(request, allowed=['post'])
 		
 		data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
-		username = data.get('username', '')
-		password = data.get('password', '')
+		username = data.get('username', None)
+		password = data.get('password', None)
 
 
 		user = authenticate(username=username, password=password)
@@ -56,37 +76,80 @@ class LoginUserResource(ModelResource):
 			if user.is_active:
 				login(request, user)
 				api_key = ApiKey.objects.get(user=user)
-				return self.create_response(request, {
-	                   'success': 1
-	                })
+				responder['success'] = 1
+				return self.create_response(request, responder)
 			else:
-				return self.create_response(request, {
-	                   'success': 0,
-	                   'reason': 'disabled',
-	                    }, HttpForbidden )
+				responder['success'] = 0
+				responder['message'] = 'disabled'
+				return self.create_response(request, responder, HttpForbidden )
 		else:
-			return self.create_response(request, {
-	                'success': 0,
-	                'reason': 'incorrect',
-	                }, HttpUnauthorized )
+			responder['success'] = 0
+			responder['message'] = 'incorrect'
+			return self.create_response(request, responder, HttpUnauthorized )
 
 	def logout(self, request, **kwargs):
 		self.method_check(request, allowed=['get'])
 		if request.user and request.user.is_authenticated():
 			logout(request)
-			return self.create_response(request, { 'success': 1 })
+			responder['success'] = 1
+			return self.create_response(request, responder)
 		else:
-			return self.create_response(request, { 'success': 0 }, HttpUnauthorized)
+			responder['success'] = 0
+			return self.create_response(request, responder, HttpUnauthorized)
+
+	def settings(self, request, **kwargs):
+		self.method_check(request, allowed=['post'])
+		data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
+		username = data.get('username',None)
+		action = data.get('action',None)
+
+		try:
+			user = User.objects.get(username=username)
+		except User.DoesNotExist:
+			responder['success'] = -10
+			responder['message'] = 'User Doesnt exist! Thats your fault CJ!'
+			return self.create_response(request,responder)
+
+		new_content = data.get('content',None)
+		if action == 'updateEmail':
+			user.email = new_content
+			try:
+				user.save()
+				responder['success'] = 1
+				responder['message'] = 'Email updated'
+				return self.create_response(request,responder)
+			except:
+				responder['success'] = 0
+				responder['message'] = 'Failed to update email. Wrong format try again.'
+				return self.create_response(request,responder)
+
+		if action == 'updateUsername':
+			user.username = new_content
+			try:
+				user.save()
+				responder['success'] = 1
+				responder['message'] = 'Username updated'
+				return self.create_response(request, responder)
+			except:
+				responder['success'] = 0
+				responder['message'] = 'Failed to update username. Type new name and try again'
+				return self.create_response(request,responder)
+
+		if action == 'updatePhoneNumber':
+			user.userprofile.phone_number = new_content
+			try:
+				user.userprofile.save()
+				responder['success'] = 1
+				responder['message'] = 'Phone number updated'
+				return self.create_response(request, responder)
+			except:
+				responder['success'] = 0
+				responder['message'] = 'Failed to update phone number. Please try again'
+				return self.create_response(request, responder)
+
+			
 
 
-class EntryResource(ModelResource):
-	user = fields.ForeignKey(LoginUserResource, 'user'
-		)
-	class Meta:
-		queryset = Entry.objects.all()
-		allowed_methods = ['get','post']
-		resource_name = 'entry'
-		#authorization = DjangoAuthorization()
 
 
 
@@ -95,6 +158,12 @@ class RegisterUserResource(ModelResource):
 	"""
 	creates a new user and returns http status 201 (created) if 
 	successful, else raises error 'username exists'
+
+	POST to /api/v1/register
+	{"username":"user",
+	 "email":"email",
+	 "password":"password"}
+
 	"""
 	class Meta:
 		object_class = User
@@ -124,7 +193,9 @@ class RegisterUserResource(ModelResource):
 				# TODO figure out what i need to do here
 				pass
 		except IntegrityError:
-			return self.create_response(bundle.request,{'success':0,'reason':'already_exists'})
+			responder['success'] = 0
+			responder['message'] = 'Username already exists'
+			return self.create_response(bundle.request,responder)
 		return bundle
 
 
@@ -132,8 +203,13 @@ class RegisterUserResource(ModelResource):
 
 from django.db import models
 from tastypie.models import create_api_key
+from models import create_profile
 
+#create api key
 models.signals.post_save.connect(create_api_key, sender=User)
+
+#create user profile
+models.signals.post_save.connect(create_profile, sender=User)
 
 """
 to send api key:
