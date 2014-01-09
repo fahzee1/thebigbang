@@ -1,6 +1,7 @@
 from tastypie.resources import ModelResource
 from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
+from models import UserProfile, MINIMUM_PASSWORD_LENGTH, validate_password
 from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication, Authentication
 from django.contrib.auth import authenticate, login, logout
 from tastypie.http import HttpUnauthorized, HttpForbidden , HttpBadRequest
@@ -11,8 +12,11 @@ from tastypie import fields
 from tastypie.serializers import Serializer
 from tastypie.models import ApiKey
 from django.db import IntegrityError
+from exceptions import CustomBadRequest
+from django.contrib.auth.hashers import make_password
 import pdb
 
+"""
 responder = {}
 class UserResource(ModelResource):
 	"""
@@ -46,6 +50,10 @@ class UserResource(ModelResource):
 		authentication = ApiKeyAuthentication()
 
 
+	def authorized_read_list(self, object_list, bundle):
+		return object_list.filter(id=bundle.request.user.id).select_related()
+
+
 	def prepend_urls(self):
 		return [
 	            url(r"^(?P<resource_name>%s)/login%s$" %
@@ -75,17 +83,15 @@ class UserResource(ModelResource):
 		if user:
 			if user.is_active:
 				login(request, user)
-				api_key = ApiKey.objects.get(user=user)
 				responder['success'] = 1
 				return self.create_response(request, responder)
 			else:
-				responder['success'] = 0
-				responder['message'] = 'disabled'
-				return self.create_response(request, responder, HttpForbidden )
+				raise CustomBadRequest(code=-1, 
+									message='Inactive user')
 		else:
-			responder['success'] = 0
-			responder['message'] = 'incorrect'
-			return self.create_response(request, responder, HttpUnauthorized )
+			raise CustomBadRequest(code=-1, 
+								message='Incorrect user or password')
+
 
 	def logout(self, request, **kwargs):
 		self.method_check(request, allowed=['get'])
@@ -94,8 +100,7 @@ class UserResource(ModelResource):
 			responder['success'] = 1
 			return self.create_response(request, responder)
 		else:
-			responder['success'] = 0
-			return self.create_response(request, responder, HttpUnauthorized)
+			raise CustomBadRequest(code=-1)
 
 	def settings(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
@@ -106,9 +111,9 @@ class UserResource(ModelResource):
 		try:
 			user = User.objects.get(username=username)
 		except User.DoesNotExist:
-			responder['success'] = -10
-			responder['message'] = 'User Doesnt exist! Thats your fault CJ!'
-			return self.create_response(request,responder)
+			raise CustomBadRequest(code=-10,
+								 message='User Doesnt exist! Thats your fault CJ!',
+								 my_error=True)
 
 		new_content = data.get('content',None)
 		if action == 'updateEmail':
@@ -119,9 +124,8 @@ class UserResource(ModelResource):
 				responder['message'] = 'Email updated'
 				return self.create_response(request,responder)
 			except:
-				responder['success'] = 0
-				responder['message'] = 'Failed to update email. Wrong format try again.'
-				return self.create_response(request,responder)
+				raise CustomBadRequest(code=-1,
+									 message='Failed to update email. Wrong format try again.')
 
 		if action == 'updateUsername':
 			user.username = new_content
@@ -131,9 +135,8 @@ class UserResource(ModelResource):
 				responder['message'] = 'Username updated'
 				return self.create_response(request, responder)
 			except:
-				responder['success'] = 0
-				responder['message'] = 'Failed to update username. Type new name and try again'
-				return self.create_response(request,responder)
+				raise CustomBadRequest(code=-1, 
+									message='Failed to update username. Type new name and try again')
 
 		if action == 'updatePhoneNumber':
 			user.userprofile.phone_number = new_content
@@ -143,21 +146,62 @@ class UserResource(ModelResource):
 				responder['message'] = 'Phone number updated'
 				return self.create_response(request, responder)
 			except:
-				responder['success'] = 0
-				responder['message'] = 'Failed to update phone number. Please try again'
-				return self.create_response(request, responder)
-
+				raise CustomBadRequest(code=-1, 
+									message='Failed to update phone number. Please try again')
 			
+"""
 
 
 
+class UserResource(ModelResource):
+
+	raw_password = fields.CharField(attribute=None,blank=True)
+
+	class Meta:
+		allowed_methods = ['get','put','patch']
+		always_return_data = True	
+		queryset = User.objects.all().select_related("api_key")
+		fields = ['username', 'email']
+		authorization = DjangoAuthorization()
+		authentication = ApiKeyAuthentication()
+
+
+	def authorized_read_list(self, object_list, bundle):
+		return object_list.filter(id=bundle.request.user.id).select_related()
+
+	def hydrate(self, bundle):
+		"""	
+		Receive request data here.
+		"""
+		if "raw_password" in bundle.data:
+			password = bundle.data.pop["raw_password"]
+			#third, check if the password is valid
+			if len(password) < MINIMUM_PASSWORD_LENGTH:
+				raise CustomBadRequest(code=-1, message="Your password should contain"
+												 	" at least %d characters" % MINIMUM_PASSWORD_LENGTH)
+
+			bundle.data['password'] = make_password(raw_password)
+
+		return bundle
+
+
+	def dehydrate(self, bundle):
+		bundle.data['api_key'] = bundle.obj.api_key.key
+
+		try:
+			del bundle.data['raw_password']
+		except KeyError:
+			pass
+
+		return bundle
 
 
 
 class RegisterUserResource(ModelResource):
 	"""
-	creates a new user and returns http status 201 (created) if 
-	successful, else raises error 'username exists'
+	creates a new user and returns http status 201 (code=1) if 
+	successful, status 400 (code=-1) if not, and status 500 (code=-10)
+	if error on our end. Check "message" in response to know exact error
 
 	POST to /api/v1/register
 	{"username":"user",
@@ -165,10 +209,9 @@ class RegisterUserResource(ModelResource):
 	 "password":"password"}
 
 	"""
+
 	class Meta:
-		object_class = User
 		resource_name = 'register'
-		fields = ['username']
 		allowed_methods = ['post']
 		include_resource_uri = False
 		always_return_data = True
@@ -176,27 +219,75 @@ class RegisterUserResource(ModelResource):
 		authentication = Authentication()
 
 
-	def obj_create(self, bundle, request=None, **kwargs):
-		#pdb.set_trace()
-		username, email, password = bundle.data['username'], bundle.data['email'], bundle.data['password']
-		try:
-			bundle.obj = User.objects.create_user(username, email, password)
-			try:
-				# get newly created api key and return to client
-				# also remove sensitve data 
-				api_key = ApiKey.objects.get(user=bundle.obj)
-				bundle.data['apikey'] = api_key.key
-				bundle.data.pop('username')
-				bundle.data.pop('password')
-				bundle.data.pop('email')
-			except:
-				# TODO figure out what i need to do here
-				pass
-		except IntegrityError:
-			responder['success'] = 0
-			responder['message'] = 'Username already exists'
-			return self.create_response(bundle.request,responder)
+	def hydrate(self, bundle):
+		"""	
+		Receive request data here.
+		"""
+		REQUIRED_USER_FIELDS = ["username", "email", "password"]
+		for field in REQUIRED_USER_FIELDS:
+			if field not in bundle.data:
+				raise CustomBadRequest(code=-10, 
+									message="Must provide %s to register" % field,
+									my_error =True)
+
 		return bundle
+
+	def obj_create(self, bundle, request=None, **kwargs):
+		try:
+			username, email, password = bundle.data['username'], bundle.data['email'], bundle.data['password']
+			#first, check if a user uses this email
+			if User.objects.filter(email=email):
+				raise CustomBadRequest(code=-1, 
+									message="That email is already used.")
+
+			#second, check if this username is taken
+			if User.objects.filter(username=username):
+				raise CustomBadRequest(code=-1, 
+									message="That username is already taken")
+
+			#third, check if the password is valid
+			if len(password) < MINIMUM_PASSWORD_LENGTH:
+				raise CustomBadRequest(code=-1, message="Your password should contain"
+												 	" at least %d characters" % MINIMUM_PASSWORD_LENGTH)
+
+			#if passed all checks create user
+			bundle.obj = User.objects.create_user(username, email, password)
+
+		except KeyError as missing_key:
+			raise CustomBadRequest(code=-10,
+								message="Must provide %s when creating User CJ!",
+								 my_error=True)
+
+		except IntegrityError:
+			raise CustomBadRequest(code=-10, message="Username already exists."
+												" Shouldnt be seeing this message though!",
+											 my_error=True)
+
+		return bundle
+
+
+	def dehydrate(self, bundle):
+		"""
+		Spit back data in response here
+		"""
+
+		bundle.data['api_key'] = bundle.obj.api_key.key
+		bundle.data['userID'] = bundle.obj.id
+
+		try:
+			del bundle.data['password']
+			del bundle.data['email']
+		except KeyError:
+			pass
+
+		return bundle
+
+
+
+
+
+
+
 
 
 
