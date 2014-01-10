@@ -1,4 +1,5 @@
 import re
+import json
 from django.db import models
 from tastypie.utils.timezone import now
 from django.utils import timezone
@@ -13,6 +14,16 @@ class TimeStampedModel(models.Model):
 		abstract = True
 
 
+class Friends(TimeStampedModel):
+	user = models.ForeignKey(User, related_name='friend_creator_set')
+	friend = models.ForeignKey(User, related_name='friend_set')
+	display_name = models.CharField(max_length=255, blank=True, null=True)
+
+	def __unicode__(self):
+		return "%s is friends with %s" %(self.friend, self.user)
+
+
+
 class UserProfile(TimeStampedModel):
 	user = models.OneToOneField(User)
 	score = models.IntegerField(default=0, blank=True, null=True)
@@ -23,6 +34,24 @@ class UserProfile(TimeStampedModel):
 
 	def __unicode__(self):
 		return self.user.username
+
+	def friends(self):
+		# or use UserObject.friend_creator_set.filter(user=self)
+		my_list =[]
+		blob = {}
+		friends = Friends.objects.filter(user=self.user).select_related()
+		for friend in friends:
+			blob['username'] = friend.friend.username
+			blob['display_name'] = friend.display_name
+			#blob['friend_created'] = friend.created_on
+			blob['friends_score'] = friend.friend.userprofile.score
+			#blob['friends_last_activity'] = friend.friend.userprofile.last_activity
+			my_list.append(blob)
+
+		return json.dumps(my_list)
+
+
+
 
 
 
@@ -36,6 +65,10 @@ def create_profile(sender,**kwargs):
 example of updating latest last_activity:
 UserProfile.objects.filter(user__id=id).update(last_activity=now)
 """
+
+
+
+
 
 MINIMUM_PASSWORD_LENGTH = 5
 REGEX_VALID_PASSWORD = (
