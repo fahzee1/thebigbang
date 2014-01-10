@@ -16,7 +16,7 @@ class TimeStampedModel(models.Model):
 class UserProfile(TimeStampedModel):
 	user = models.OneToOneField(User)
 	score = models.IntegerField(default=0, blank=True, null=True)
-	phone_number = models.CharField(max_length=15, blank=True, null=True)
+	phone_number = models.CharField(max_length=255, blank=True, null=True)
 	facebook_user = models.BooleanField(default=False , blank=True)
 	last_activity = models.DateTimeField(default=now,auto_now_add=True)
 

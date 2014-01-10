@@ -8,9 +8,8 @@ class CustomBadRequest(TastypieError):
 	def __init__(self, code="", message="", my_error=False):
 		self.application_error = my_error
 		self._response = { 
-				"error":
-					{"code": code or "not_provided",
-					 "message": message or "No error message was provided"}
+					 "code": code or "not_provided",
+					 "message": message or "No error message was provided"
 					 }
 
 	@property 

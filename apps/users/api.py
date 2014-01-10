@@ -13,10 +13,9 @@ from tastypie.serializers import Serializer
 from tastypie.models import ApiKey
 from django.db import IntegrityError
 from exceptions import CustomBadRequest
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password, is_password_usable
 import pdb
 
-"""
 responder = {}
 class UserResource(ModelResource):
 	"""
@@ -41,10 +40,12 @@ class UserResource(ModelResource):
 	 "content":"test@email.com"}
 
 	"""
+
 	class Meta:
 		queryset = User.objects.all()
 		resource_name = 'user'
-		fields = ['username','email']
+		excludes = ['is_active','is_staff','is_superuser',
+					'first_name','last_name','password']
 		allowed_methods = ['get','post']
 		authorization = DjangoAuthorization()
 		authentication = ApiKeyAuthentication()
@@ -56,13 +57,10 @@ class UserResource(ModelResource):
 
 	def prepend_urls(self):
 		return [
-	            url(r"^(?P<resource_name>%s)/login%s$" %
+				url(r'^(?P<resource_name>%s)/login%s$' %
 	                (self._meta.resource_name, trailing_slash()),
-	                self.wrap_view('login'), name="api_login"),
+	                self.wrap_view('login'), name='api_login'),
 	            url(r'^(?P<resource_name>%s)/logout%s$' %
-	                (self._meta.resource_name, trailing_slash()),
-	                self.wrap_view('logout'), name='api_logout'),
-	            url(r'^(?P<resource_name>%s)/signup%s$' %
 	                (self._meta.resource_name, trailing_slash()),
 	                self.wrap_view('logout'), name='api_logout'),
 	            url(r'^(?P<resource_name>%s)/settings%s$' %
@@ -70,7 +68,35 @@ class UserResource(ModelResource):
 	                self.wrap_view('settings'), name='api_settings'),
 	            ]
 
+	"""
+	def hydrate(self, bundle):
+		#pdb.set_trace()
+		REQUIRED_USER_FIELDS = ['username', 'password']
+		for field in REQUIRED_USER_FIELDS:
+			if field not in REQUIRED_USER_FIELDS:
+				raise CustomBadRequest(code=-10,
+									message='%s is required for user resource',
+									my_error=True)
+		try:
+			username = bundle.data['username']
+			password = bundle.data['password']
+			user = authenticate(username=username,password=password)
+			if user:
+				if user.is_active:
+					login(bundle.request,user)
+				else:
+					raise CustomBadRequest(code=-1, 
+										message='Inactive user')
+			else:
+				raise CustomBadRequest(code=-1, 
+									message='Incorrect user or password')
 
+		except KeyError:
+			pass
+
+		return bundle
+
+	"""
 	def login(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
 		
@@ -83,7 +109,7 @@ class UserResource(ModelResource):
 		if user:
 			if user.is_active:
 				login(request, user)
-				responder['success'] = 1
+				responder['code'] = 1
 				return self.create_response(request, responder)
 			else:
 				raise CustomBadRequest(code=-1, 
@@ -92,15 +118,16 @@ class UserResource(ModelResource):
 			raise CustomBadRequest(code=-1, 
 								message='Incorrect user or password')
 
-
 	def logout(self, request, **kwargs):
 		self.method_check(request, allowed=['get'])
 		if request.user and request.user.is_authenticated():
 			logout(request)
-			responder['success'] = 1
+			responder['code'] = 1
+			responder['message'] = 'Successfull Logout'
 			return self.create_response(request, responder)
 		else:
-			raise CustomBadRequest(code=-1)
+			raise CustomBadRequest(code=-1,
+								message='User was never authenticated')
 
 	def settings(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
@@ -148,53 +175,17 @@ class UserResource(ModelResource):
 			except:
 				raise CustomBadRequest(code=-1, 
 									message='Failed to update phone number. Please try again')
-			
-"""
 
-
-
-class UserResource(ModelResource):
-
-	raw_password = fields.CharField(attribute=None,blank=True)
-
-	class Meta:
-		allowed_methods = ['get','put','patch']
-		always_return_data = True	
-		queryset = User.objects.all().select_related("api_key")
-		fields = ['username', 'email']
-		authorization = DjangoAuthorization()
-		authentication = ApiKeyAuthentication()
-
-
-	def authorized_read_list(self, object_list, bundle):
-		return object_list.filter(id=bundle.request.user.id).select_related()
-
-	def hydrate(self, bundle):
-		"""	
-		Receive request data here.
-		"""
-		if "raw_password" in bundle.data:
-			password = bundle.data.pop["raw_password"]
-			#third, check if the password is valid
-			if len(password) < MINIMUM_PASSWORD_LENGTH:
-				raise CustomBadRequest(code=-1, message="Your password should contain"
-												 	" at least %d characters" % MINIMUM_PASSWORD_LENGTH)
-
-			bundle.data['password'] = make_password(raw_password)
-
-		return bundle
-
-
-	def dehydrate(self, bundle):
-		bundle.data['api_key'] = bundle.obj.api_key.key
-
+	def dehydrate(self,bundle):
 		try:
-			del bundle.data['raw_password']
+			bundle.data['phone_number'] = bundle.obj.userprofile.phone_number
+			bundle.data['score'] = bundle.obj.userprofile.score
+			bundle.data['facebook_user'] = bundle.obj.userprofile.facebook_user
+			bundle.data['last_activity'] = bundle.obj.userprofile.last_activity
 		except KeyError:
 			pass
 
 		return bundle
-
 
 
 class RegisterUserResource(ModelResource):
@@ -255,7 +246,7 @@ class RegisterUserResource(ModelResource):
 
 		except KeyError as missing_key:
 			raise CustomBadRequest(code=-10,
-								message="Must provide %s when creating User CJ!",
+								message="Must provide %s when creating User CJ!" % missing_key,
 								 my_error=True)
 
 		except IntegrityError:
