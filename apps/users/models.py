@@ -4,6 +4,8 @@ from django.db import models
 from tastypie.utils.timezone import now
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
+from django.core import serializers
 # Create your models here.
 
 
@@ -35,7 +37,35 @@ class UserProfile(TimeStampedModel):
 	def __unicode__(self):
 		return self.user.username
 
-	def friends(self):
+	def return_json(self, login=False):
+		"""
+		creating json response that mirrors that
+		of django tastypie for custom login method
+		"""
+		profile_data = serializers.serialize('json',[self,self.user])
+		p_json = json.loads(profile_data)
+		profile_json = p_json[0]['fields']
+		user_json = p_json[1]['fields']
+		try:
+			del user_json['is_active']
+			del user_json['is_superuser']
+			del user_json['is_staff']
+			del user_json['groups']
+			del user_json['user_permissions']
+			del user_json['password']
+		except KeyError:
+			pass
+
+
+		profile_json['user'] = user_json
+		profile_json['my_friends'] = self.friends
+		if login:
+			profile_json['code'] = 11
+			profile_json['message'] = 'Login was successful.'
+
+		return json.dumps(profile_json, cls=DjangoJSONEncoder)
+
+	def my_friends(self):
 		# or use UserObject.friend_creator_set.filter(user=self)
 		my_list =[]
 		blob = {}
@@ -43,12 +73,17 @@ class UserProfile(TimeStampedModel):
 		for friend in friends:
 			blob['username'] = friend.friend.username
 			blob['display_name'] = friend.display_name
-			#blob['friend_created'] = friend.created_on
+			blob['friend_created'] = friend.created_on
 			blob['friends_score'] = friend.friend.userprofile.score
-			#blob['friends_last_activity'] = friend.friend.userprofile.last_activity
+			blob['friends_last_activity'] = friend.friend.userprofile.last_activity
 			my_list.append(blob)
 
-		return json.dumps(my_list)
+		return json.dumps(my_list, cls=DjangoJSONEncoder)
+
+	friends = property(my_friends)
+
+
+
 
 
 
@@ -90,4 +125,8 @@ def validate_password(password):
 	if re.match(REGEX_VALID_PASSWORD, password):
 		return True
 	return False
+
+
+
+
 

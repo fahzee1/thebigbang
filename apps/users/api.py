@@ -15,32 +15,11 @@ from django.db import IntegrityError
 from exceptions import CustomBadRequest
 from django.contrib.auth.hashers import make_password, check_password, is_password_usable
 import pdb
+import json
 
 responder = {}
 class UserResource(ModelResource):
-	"""
-	Login:
-	POST to /api/v1/user/login
-	{"username":"user",
-	"password":"pword}
-
-	Logout:
-	GET to /api/v1/user/logout
-	no params
-
-	Update Settings:
-	POST to /api/v1/user/settings
-	action params:
-		-updateEmail
-		-updateUsername
-		-updatePhoneNumber
-
-	{"username":"user"
-	 "action":"updateEmail,
-	 "content":"test@email.com"}
-
-	"""
-
+	
 	class Meta:
 		queryset = User.objects.all()
 		resource_name = 'user'
@@ -55,6 +34,65 @@ class UserResource(ModelResource):
 		return object_list.filter(id=bundle.request.user.id).select_related()
 
 
+	def logout(self, request, **kwargs):
+		self.method_check(request, allowed=['get'])
+		if request.user and request.user.is_authenticated():
+			logout(request)
+			responder['code'] = 1
+			responder['message'] = 'Successfull Logout'
+			return self.create_response(request, responder)
+		else:
+			raise CustomBadRequest(code=-1,
+								message='User was never authenticated')
+
+
+
+
+
+class UserProfileResource(ModelResource):
+	"""
+	Login:
+	POST to /api/v1/profile/login
+	{"username":"user",
+	"password":"pword}
+
+	Logout:
+	GET to /api/v1/profile/logout
+	no params
+
+	Update Settings:
+	POST to /api/v1/profile/settings
+	action params:
+		-updateEmail
+		-updateUsername
+		-updatePhoneNumber
+
+	{"username":"user"
+	 "action":"updateEmail,
+	 "content":"test@email.com"}
+
+	"""
+
+	user = fields.ForeignKey(UserResource, 'user', full=True)
+	my_friends = fields.CharField(attribute="friends",blank=True, null=True)
+
+	class Meta:
+		queryset = UserProfile.objects.all()
+		resource_name = 'profile'
+		authentication = ApiKeyAuthentication()
+        authorization = DjangoAuthorization()
+        always_return_data = True
+        allowed_methods = ['get', 'put', 'patch' ]
+
+
+
+	def authorized_read_list(self, object_list, bundle):
+		return object_list.filter(user=bundle.request.user).select_related()
+
+	def get_list(self, request, **kwargs):
+		kwargs["pk"] = request.user.userprofile.pk
+		return super(UserProfileResource, self).get_detail(request, **kwargs)
+
 	def prepend_urls(self):
 		return [
 				url(r'^(?P<resource_name>%s)/login%s$' %
@@ -68,35 +106,7 @@ class UserResource(ModelResource):
 	                self.wrap_view('settings'), name='api_settings'),
 	            ]
 
-	"""
-	def hydrate(self, bundle):
-		#pdb.set_trace()
-		REQUIRED_USER_FIELDS = ['username', 'password']
-		for field in REQUIRED_USER_FIELDS:
-			if field not in REQUIRED_USER_FIELDS:
-				raise CustomBadRequest(code=-10,
-									message='%s is required for user resource',
-									my_error=True)
-		try:
-			username = bundle.data['username']
-			password = bundle.data['password']
-			user = authenticate(username=username,password=password)
-			if user:
-				if user.is_active:
-					login(bundle.request,user)
-				else:
-					raise CustomBadRequest(code=-1, 
-										message='Inactive user')
-			else:
-				raise CustomBadRequest(code=-1, 
-									message='Incorrect user or password')
 
-		except KeyError:
-			pass
-
-		return bundle
-
-	"""
 	def login(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
 		
@@ -110,7 +120,7 @@ class UserResource(ModelResource):
 			if user.is_active:
 				login(request, user)
 				responder['code'] = 1
-				return self.create_response(request, responder)
+				return self.create_response(request, json.loads(user.userprofile.return_json(login=True)))
 			else:
 				raise CustomBadRequest(code=-1, 
 									message='Inactive user')
@@ -118,16 +128,19 @@ class UserResource(ModelResource):
 			raise CustomBadRequest(code=-1, 
 								message='Incorrect user or password')
 
+
 	def logout(self, request, **kwargs):
 		self.method_check(request, allowed=['get'])
 		if request.user and request.user.is_authenticated():
 			logout(request)
 			responder['code'] = 1
-			responder['message'] = 'Successfull Logout'
+			responder['message'] = 'Successful Logout'
 			return self.create_response(request, responder)
 		else:
 			raise CustomBadRequest(code=-1,
 								message='User was never authenticated')
+
+
 
 	def settings(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
@@ -176,16 +189,11 @@ class UserResource(ModelResource):
 				raise CustomBadRequest(code=-1, 
 									message='Failed to update phone number. Please try again')
 
-	def dehydrate(self,bundle):
-		try:
-			bundle.data['phone_number'] = bundle.obj.userprofile.phone_number
-			bundle.data['score'] = bundle.obj.userprofile.score
-			bundle.data['facebook_user'] = bundle.obj.userprofile.facebook_user
-			bundle.data['last_activity'] = bundle.obj.userprofile.last_activity
-		except KeyError:
-			pass
 
-		return bundle
+
+
+
+  
 
 
 class RegisterUserResource(ModelResource):
