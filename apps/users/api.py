@@ -120,7 +120,7 @@ class UserProfileResource(ModelResource):
 			if user.is_active:
 				login(request, user)
 				responder['code'] = 1
-				return self.create_response(request, json.loads(user.userprofile.return_json(login=True)))
+				return self.create_response(request, user.userprofile.return_json(login=True))
 			else:
 				raise CustomBadRequest(code=-1, 
 									message='Inactive user')

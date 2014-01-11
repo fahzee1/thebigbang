@@ -63,7 +63,7 @@ class UserProfile(TimeStampedModel):
 			profile_json['code'] = 11
 			profile_json['message'] = 'Login was successful.'
 
-		return json.dumps(profile_json, cls=DjangoJSONEncoder)
+		return profile_json
 
 	def my_friends(self):
 		# or use UserObject.friend_creator_set.filter(user=self)
