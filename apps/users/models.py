@@ -1,19 +1,17 @@
 import re
+import base64
 import json
+import pdb
 from django.db import models
-from tastypie.utils.timezone import now
-from django.utils import timezone
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core import serializers
+from tastypie.utils.timezone import now
+from apps.challenges.models import Challenge, ChallengeResults, TimeStampedModel
+
 # Create your models here.
 
-
-class TimeStampedModel(models.Model):
-	created_on = models.DateTimeField(default=now,auto_now_add=True)
-
-	class Meta:
-		abstract = True
 
 
 class Friends(TimeStampedModel):
@@ -32,6 +30,9 @@ class UserProfile(TimeStampedModel):
 	phone_number = models.CharField(max_length=255, blank=True, null=True)
 	facebook_user = models.BooleanField(default=False , blank=True)
 	last_activity = models.DateTimeField(default=now,auto_now_add=True)
+	device_token = models.CharField(default="",max_length=255)
+	privacy = models.IntegerField(default=0)
+	sent_challenges = models.IntegerField(default=0)
 
 
 	def __unicode__(self):
@@ -59,6 +60,11 @@ class UserProfile(TimeStampedModel):
 
 		profile_json['user'] = user_json
 		profile_json['my_friends'] = self.friends
+		profile_json['friend_requests'] = self.friend_requests
+		profile_json['my_challenges'] = self.my_challenges
+		profile_json['received_challenges'] = self.received_challenges
+		profile_json['phone_number'] = base64.b64decode(profile_json['phone_number'])
+
 		if login:
 			profile_json['code'] = 11
 			profile_json['message'] = 'Login was successful.'
@@ -66,8 +72,11 @@ class UserProfile(TimeStampedModel):
 		return profile_json
 
 	def my_friends(self):
+		"""
+		Returns json of all users friends
+		"""
 		# or use UserObject.friend_creator_set.filter(user=self)
-		my_list =[]
+		my_list = []
 		blob = {}
 		friends = Friends.objects.filter(user=self.user).select_related()
 		for friend in friends:
@@ -82,6 +91,80 @@ class UserProfile(TimeStampedModel):
 
 	friends = property(my_friends)
 
+	def my_requests(self):
+		"""
+		Returns json of all friends that added
+		this user as a friend
+		"""
+		my_list = []
+		blob = {}
+		friends = Friends.objects.filter(friend=self.user).select_related()
+		for friend in friends:
+			blob['username'] = friend.user.username
+			blob['display_name'] = friend.display_name
+			blob['friend_created'] = friend.created_on
+			blob['friends_score'] = friend.user.userprofile.score
+			blob['friends_last_activity'] = friend.user.userprofile.last_activity
+			my_list.append(blob)
+
+		return json.dumps(my_list, cls=DjangoJSONEncoder)
+
+	friend_requests = property(my_requests)
+
+	def my_challenges(self):
+		"""
+		Returns json of all challenges
+		this user has sent
+		"""
+		
+		my_list = []
+		blob = {'results':[]}
+		challenges = Challenge.objects.filter(sender=self.user).select_related()
+		for challenge in challenges:
+			blob['id'] = challenge.challenge_id
+			blob['media_type'] = challenge.media_type
+			blob['challenge_type'] = challenge.challenge_type
+			blob['challenge_created'] = challenge.created_on
+			blob['name'] = challenge.name
+			for result in challenge.results.all():
+				result_blob = {'player': result.player.username,
+				               'success': result.success}
+				blob['results'].append(result_blob)
+
+			my_list.append(blob)
+
+		return json.dumps(my_list, cls=DjangoJSONEncoder)
+
+
+	my_challenges = property(my_challenges)
+
+
+	def received_challenges(self):
+		"""
+		Returns json of all challenges
+		this user has received
+		"""
+		my_list = []
+		challenges = ChallengeResults.objects.filter(player=self.user).select_related()
+		for challenge in challenges:
+			blob = {
+				'challenge':{
+				   		'id': challenge.challenge.challenge_id,
+				   		'media_type': challenge.challenge.media_type,
+				   		'challenge_type': challenge.challenge.challenge_type,
+				   		'challenge_created': challenge.challenge.created_on,
+				   		'name': challenge.challenge.name,
+				   		'result':{
+				   				'success': challenge.success,
+				   				'sender': challenge.challenge.sender.username}
+				   			}
+				}
+			my_list.append(blob)
+
+		return json.dumps(my_list, cls=DjangoJSONEncoder)
+
+
+	received_challenges = property(received_challenges)
 
 
 

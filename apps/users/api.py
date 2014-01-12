@@ -1,3 +1,6 @@
+import pdb
+import json
+import base64
 from tastypie.resources import ModelResource
 from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
@@ -14,8 +17,7 @@ from tastypie.models import ApiKey
 from django.db import IntegrityError
 from exceptions import CustomBadRequest
 from django.contrib.auth.hashers import make_password, check_password, is_password_usable
-import pdb
-import json
+
 
 responder = {}
 class UserResource(ModelResource):
@@ -74,8 +76,10 @@ class UserProfileResource(ModelResource):
 	"""
 
 	user = fields.ForeignKey(UserResource, 'user', full=True)
-	my_friends = fields.CharField(attribute="friends",blank=True, null=True)
-
+	my_friends = fields.CharField(attribute="friends", blank=True, null=True)
+	friend_requests = fields.CharField(attribute="friend_requests", blank=True, null=True)
+	my_challenges = fields.CharField(attribute="my_challenges", blank=True, null=True)
+	received_challenges = fields.CharField(attribute="received_challenges", blank=True, null=True)
 	class Meta:
 		queryset = UserProfile.objects.all()
 		resource_name = 'profile'
@@ -179,7 +183,10 @@ class UserProfileResource(ModelResource):
 									message='Failed to update username. Type new name and try again')
 
 		if action == 'updatePhoneNumber':
-			user.userprofile.phone_number = new_content
+			#store hash of phone number
+			#dont forget to decode when needed
+			#base64.b64decode(hash)
+			user.userprofile.phone_number = base64.b64encode(new_content)
 			try:
 				user.userprofile.save()
 				responder['success'] = 1
@@ -188,6 +195,16 @@ class UserProfileResource(ModelResource):
 			except:
 				raise CustomBadRequest(code=-1, 
 									message='Failed to update phone number. Please try again')
+
+
+	def dehydrate(self, bundle):
+		try:
+			bundle.data['phone_number'] = base64.b64decode(bundle.data['phone_number'])
+
+		except:
+			pass
+			
+		return bundle
 
 
 
@@ -280,8 +297,6 @@ class RegisterUserResource(ModelResource):
 			pass
 
 		return bundle
-
-
 
 
 
