@@ -19,6 +19,9 @@ class Friends(TimeStampedModel):
     friend = models.ForeignKey(User, related_name='friend_set')
     display_name = models.CharField(max_length=255, blank=True, null=True)
 
+    class Meta:
+        unique_together = (("user","friend"),)
+
     def __unicode__(self):
         return "%s is friends with %s" %(self.friend, self.user)
 

@@ -71,6 +71,7 @@ class UserProfileResource(ModelResource):
         -updateEmail
         -updateUsername
         -updatePhoneNumber
+        -updatePrivacy
 
     {"username":"user"
      "action":"updateEmail,
@@ -91,17 +92,6 @@ class UserProfileResource(ModelResource):
      "content":"dependent on action"
      }
 
-     Send:
-     POST to /api/v1/send
-     challenge_id param:
-         -id of challenge
-     recipients:
-         -list of userames to send to
-
-    {"challenge_id":"id",
-    "recipients":["user", "user2", "user3"],
-    "username":"user"
-    }
 
 
     """
@@ -142,69 +132,8 @@ class UserProfileResource(ModelResource):
                 url(r'^(?P<resource_name>%s)/friends%s$' %
                     (self._meta.resource_name, trailing_slash()),
                     self.wrap_view('friends'), name='api_friends'),
-                url(r'^send%s$' %(trailing_slash()),
-                    self.wrap_view('send_challenge'), name='api_send'),
                 ]
 
-
-    def send_challenge(self, request, **kwargs):
-        self.method_check(request, allowed=['post'])
-        data = self.deserialize(request, 
-                                request.body,
-                                format=request.META.get('CONTENT_TYPE', 'application/json'))
-        username = data.get('username', None)
-        challenge_id = data.get('challenge_id', None)
-        recipients = data.get('recipients', None) 
-        if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when sending challenge!',
-                                   my_error=True)
-
-        if not challenge_id:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge id when sending challenge!',
-                                   my_error=True)
-
-        if not recipients:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide recipients when sending challenge!',
-                                   my_error=True)
-
-        try:
-            sender = User.objects.get(username=username)
-        except User.DoesNotExist:
-            raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
-
-        try:
-            challenge = Challenge.objects.get(challenge_id=challenge_id)
-        except Challenge.DoesNotExist:
-            raise CustomBadRequest(code=-10,
-                                   message='Challenge Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
-
-        try:
-            send = ChallengeSend()
-            send.sender = sender
-            send.challenge = challenge
-            send.save()
-            for reciever in recipients:
-                try:
-                    user = User.objects.get(username=reciever)
-                    send.recipients.add(user)
-                except User.DoesNotExist:
-                    raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
-            responder['code'] = 1
-            responder['message'] = 'Successfully sent challenge!'
-            return self.create_response(request, responder)
-
-        except:
-            raise CustomBadRequest(code=-10,
-                                   message='Not sure what happened, but thats your fault CJ!',
-                                   my_error=True)
             
 
 
@@ -404,6 +333,28 @@ class UserProfileResource(ModelResource):
             except:
                 raise CustomBadRequest(code=-1, 
                                     message='Failed to update phone number. Please try again')
+
+        if action == 'updatePrivacy':
+            user.privacy = new_content
+            try:
+                user.save()
+                responder['success'] = 1
+                responder['message'] = 'Privacy updated'
+                return self.create_response(request, responder)
+            except:
+                raise CustomBadRequest(code=-1, 
+                                    message='Failed to update privacy. Please try again')
+
+        if action != 'updatePrivacy' and \
+           action != 'updateEmail' and \
+           action != 'updateUsername' and \
+           action != 'updatePhoneNumber':
+           raise CustomBadRequest(code=-1,
+                                 message="Must proide either 'updateUsername', 'updatePrivacy' "
+                                 ", updateEmail' or 'updatePhoneNumber' when updating settings")
+
+
+
 
 
     def dehydrate(self, bundle):

@@ -1,7 +1,9 @@
+import json
 from django.db import models
 from tastypie.utils.timezone import now
 from django.contrib.auth.models import User
-
+from django.core.serializers.json import DjangoJSONEncoder
+import base64
 
 
 def get_upload_path(instance , filname):
@@ -22,18 +24,34 @@ class TimeStampedModel(models.Model):
 
 
 class Challenge(TimeStampedModel):
+    """
+    TODO django 1.6 has new binary filed to store raw data
+    might just use that to store base64 photos and videos
+    """
     sender = models.ForeignKey(User, blank=False, null=False)
     name = models.CharField(default='level 1', max_length=255,blank=True, null=True)
-    challenge_id = models.CharField(max_length=255, blank=False, null=False)
-    challenge_media = models.FileField(upload_to=get_upload_path, blank=False, null=False)
+    challenge_id = models.CharField(max_length=255, blank=False, null=False, unique=True)
+    media_data = models.BinaryField()
     media_type = models.IntegerField(default=0, help_text='Picture or video?')
     challenge_type = models.IntegerField(default=0, help_text='What level challenge?')
     answer = models.CharField(max_length=255, blank=False, null=False)
     hint = models.CharField(max_length=255, blank=True, null=True)
+    active = models.BooleanField(default=True)
 
 
     def __unicode__(self):
         return "Challenge: %d User: %s" % (self.id, self.sender.username)
+
+
+    def spit_data(self):
+        blob = {'media':{
+                'media_type':self.media_type,
+                'data': base64.b64encode(self.media_data)
+        }}
+
+        return json.dumps(blob)
+
+    spit_json = property(spit_data)
 
     def get_points(self):
         if self.challenge_type == 0:
