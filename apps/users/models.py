@@ -9,6 +9,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.core import serializers
 from tastypie.utils.timezone import now
 from apps.challenges.models import Challenge, ChallengeResults, TimeStampedModel
+from utils import ENCRYPT_KEY, encode, decode
 
 # Create your models here.
 
@@ -66,7 +67,7 @@ class UserProfile(TimeStampedModel):
         profile_json['friend_requests'] = self.friend_requests
         profile_json['my_challenges'] = self.my_challenges
         profile_json['received_challenges'] = self.received_challenges
-        profile_json['phone_number'] = base64.b64decode(profile_json['phone_number'])
+        profile_json['phone_number'] = decode(ENCRYPT_KEY, str(profile_json['phone_number']))
 
         if login:
             profile_json['code'] = 11

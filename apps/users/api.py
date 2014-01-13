@@ -18,6 +18,7 @@ from tastypie.models import ApiKey
 from django.db import IntegrityError
 from exceptions import CustomBadRequest
 from django.contrib.auth.hashers import make_password, check_password, is_password_usable
+from utils import ENCRYPT_KEY, encode, decode
 
 
 responder = {}
@@ -324,7 +325,7 @@ class UserProfileResource(ModelResource):
             #store hash of phone number
             #dont forget to decode when needed
             #base64.b64decode(hash)
-            user.userprofile.phone_number = base64.b64encode(new_content)
+            user.userprofile.phone_number = encode(ENCRYPT_KEY,new_content)
             try:
                 user.userprofile.save()
                 responder['success'] = 1
@@ -360,7 +361,8 @@ class UserProfileResource(ModelResource):
     def dehydrate(self, bundle):
         #phone number is encoded so decode it in response
         try:
-            bundle.data['phone_number'] = base64.b64decode(bundle.data['phone_number'])
+
+            bundle.data['phone_number'] = decode(ENCRYPT_KEY, str(bundle.data['phone_number']))
         except:
             pass
 
