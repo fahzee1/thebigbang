@@ -4,7 +4,8 @@ import base64
 from tastypie.resources import ModelResource
 from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
-from models import UserProfile, MINIMUM_PASSWORD_LENGTH, validate_password
+from models import UserProfile, Friends, MINIMUM_PASSWORD_LENGTH, validate_password
+from apps.challenges.models import Challenge, ChallengeSend
 from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication, Authentication
 from django.contrib.auth import authenticate, login, logout
 from tastypie.http import HttpUnauthorized, HttpForbidden , HttpBadRequest
@@ -20,6 +21,8 @@ from django.contrib.auth.hashers import make_password, check_password, is_passwo
 
 
 responder = {}
+
+
 class UserResource(ModelResource):
 	
 	class Meta:
@@ -73,6 +76,25 @@ class UserProfileResource(ModelResource):
 	 "action":"updateEmail,
 	 "content":"test@email.com"}
 
+	 Friends:
+	 POST to /api/v1/profile/friends
+	 action params:
+	     -add
+	     -delete
+	     -display
+	 friend param:
+	     -user
+
+	 {"username":"user",
+	 "friend":"user"
+	 "action":"updateEmail",
+	 "content":"dependent on action"
+	 }
+
+	 Send:
+	 POST to /api/v1/profile
+
+
 	"""
 
 	user = fields.ForeignKey(UserResource, 'user', full=True)
@@ -108,23 +130,192 @@ class UserProfileResource(ModelResource):
 	            url(r'^(?P<resource_name>%s)/settings%s$' %
 	                (self._meta.resource_name, trailing_slash()),
 	                self.wrap_view('settings'), name='api_settings'),
+	            url(r'^(?P<resource_name>%s)/friends%s$' %
+	                (self._meta.resource_name, trailing_slash()),
+	                self.wrap_view('friends'), name='api_friends'),
+	            url(r'^send%s$' %(trailing_slash()),
+	                self.wrap_view('send_challenge'), name='api_send'),
 	            ]
+
+
+	def send_challenge(self, request, **kwargs):
+		self.method_check(request, allowed=['post'])
+		data = self.deserialize(request, 
+		                        request.body,
+		                        format=request.META.get('CONTENT_TYPE', 'application/json'))
+		username = data.get('username', None)
+		challenge_id = data.get('challenge_id', None)
+		recipients = data.get('recipients', None) 
+		if not username:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide username when sending challenge!',
+				                   my_error=True)
+
+		if not challenge_id:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide challenge id when sending challenge!',
+				                   my_error=True)
+
+		if not recipients:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide recipients when sending challenge!',
+				                   my_error=True)
+
+		try:
+			sender = User.objects.get(username=username)
+		except User.DoesNotExist:
+			raise CustomBadRequest(code=-10,
+				                   message='User Doesnt exist! Thats your fault CJ!',
+				                   my_error=True)
+
+		try:
+			challenge = Challenge.objects.get(challenge_id=challenge_id)
+		except Challenge.DoesNotExist:
+			raise CustomBadRequest(code=-10,
+				                   message='Challenge Doesnt exist! Thats your fault CJ!',
+				                   my_error=True)
+
+		try:
+			send = ChallengeSend()
+			send.sender = sender
+			send.challenge = challenge
+			send.save()
+			for reciever in recipients:
+				try:
+					user = User.objects.get(username=reciever)
+					send.recipients.add(user)
+				except User.DoesNotExist:
+					raise CustomBadRequest(code=-10,
+				                   message='User Doesnt exist! Thats your fault CJ!',
+				                   my_error=True)
+			responder['code'] = 1
+			responder['message'] = 'Successfully sent challenge!'
+			return self.create_response(request, responder)
+
+		except:
+			raise CustomBadRequest(code=-10,
+				                   message='Not sure what happened, but thats your fault CJ!',
+				                   my_error=True)
+			
+
+
+	def friends(self, request, **kwargs):
+		self.method_check(request, allowed=['post'])
+		data = self.deserialize(request, 
+		                        request.body,
+		                        format=request.META.get('CONTENT_TYPE', 'application/json'))
+		username = data.get('username', None)
+		friend = data.get('friend', None)
+		action = data.get('action', None)
+		content = data.get('content', None)
+		if not username:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide username when updating friends!',
+				                   my_error=True)
+
+		if not friend:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide friend when updating friends',
+				                   my_error=True)
+
+		if not action:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide action when updating friends',
+				                   my_error=True)
+
+		try:
+			me = User.objects.get(username=username)
+		except User.DoesNotExist:
+			raise CustomBadRequest(code=-10,
+				                   message='User Doesnt exist! Thats your fault CJ!',
+				                   my_error=True)
+
+		try:
+			friend = User.objects.get(username=friend)
+		except User.DoesNotExist:
+			raise CustomBadRequest(code=-10,
+				                   message='Friend Doesnt exist! Thats your fault CJ!',
+				                   my_error=True)
+		if action == 'add':
+			if Friends.objects.filter(user=me, friend=friend):
+				raise CustomBadRequest(code=-1,
+						               message='Friendship already exists')
+			else:
+				try:
+					Friends.objects.create(user=me,
+					                   friend=friend,
+					                   display_name=friend.username)
+					responder['code'] = 1
+					responder['message'] = 'Successfully added friend!'
+					return self.create_response(request, responder)
+				except:
+					raise CustomBadRequest(code=-1,
+					                       message='Error creating friendship',
+					                       my_error=True)
+
+
+		if action == 'delete':
+			try:
+				friendship = Friends.objects.get(user=me, friend=friend)
+				friendship.delete()
+				responder['code'] = 1
+				responder['message'] = 'Successfully deleted friend!'
+				return self.create_response(request, responder)
+			except Friends.DoesNotExist:
+				raise CustomBadRequest(code=-10,
+					                   message='Friend already deleted',
+					                   my_error=True)
+
+		if action == 'display':
+			if not content:
+				raise CustomBadRequest(code=-1,
+					                   message='Must provide content when updating friends display name!',
+					                   my_error=True)
+			try:
+				friend = Friends.objects.get(user=me, friend=friend)
+				friend.display_name = content
+				friend.save()
+				responder['code'] = 1
+				responder['message'] = 'Successfully updated friends display name'
+				return self.create_response(request, responder)
+			except Friends.DoesNotExist:
+				raise CustomBadRequest(code=-10,
+					                   message='Friend doesnt exist!',
+					                   my_error=True)
+
+
+
+		if action != 'add' and action != 'delete' and action != 'display':
+			raise CustomBadRequest(code=-1,
+				                   message="Action parameter should be either 'add', 'delete' or 'display ",
+				                   my_error=True)
 
 
 	def login(self, request, **kwargs):
 		self.method_check(request, allowed=['post'])
 		
-		data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
+		data = self.deserialize(request,
+		                        request.body,	
+		                        format=request.META.get('CONTENT_TYPE', 'application/json'))
 		username = data.get('username', None)
 		password = data.get('password', None)
+		if not username:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide username when logging in!',
+				                   my_error=True)
 
+		if not password:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide password when logging in!',
+				                   my_error=True)
 
 		user = authenticate(username=username, password=password)
 		if user:
 			if user.is_active:
 				login(request, user)
 				responder['code'] = 1
-				return self.create_response(request, user.userprofile.return_json(login=True))
+				return self.create_response(request,
+				                            user.userprofile.return_json(login=True))
 			else:
 				raise CustomBadRequest(code=-1, 
 									message='Inactive user')
@@ -151,6 +342,15 @@ class UserProfileResource(ModelResource):
 		data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
 		username = data.get('username',None)
 		action = data.get('action',None)
+		if not username:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide username when updating settings!',
+				                   my_error=True)
+
+		if not action:
+			raise CustomBadRequest(code=-1,
+				                   message='Must provide action when updating settings!',
+				                   my_error=True)
 
 		try:
 			user = User.objects.get(username=username)
@@ -198,12 +398,12 @@ class UserProfileResource(ModelResource):
 
 
 	def dehydrate(self, bundle):
+		#phone number is encoded so decode it in response
 		try:
 			bundle.data['phone_number'] = base64.b64decode(bundle.data['phone_number'])
-
 		except:
 			pass
-			
+
 		return bundle
 
 
@@ -222,7 +422,9 @@ class RegisterUserResource(ModelResource):
 	POST to /api/v1/register
 	{"username":"user",
 	 "email":"email",
-	 "password":"password"}
+	 "password":"password",
+	 "fbook_user":"yes"
+	 }
 
 	"""
 
@@ -239,7 +441,7 @@ class RegisterUserResource(ModelResource):
 		"""	
 		Receive request data here.
 		"""
-		REQUIRED_USER_FIELDS = ["username", "email", "password"]
+		REQUIRED_USER_FIELDS = ["username", "email", "password", "fbook_user"]
 		for field in REQUIRED_USER_FIELDS:
 			if field not in bundle.data:
 				raise CustomBadRequest(code=-10, 
@@ -250,7 +452,12 @@ class RegisterUserResource(ModelResource):
 
 	def obj_create(self, bundle, request=None, **kwargs):
 		try:
-			username, email, password = bundle.data['username'], bundle.data['email'], bundle.data['password']
+			username = bundle.data['username'] 
+			email = bundle.data['email']
+			password = bundle.data['password']
+			fbook = bundle.data['fbook_user']
+			is_fbook = (True if fbook == 'yes' else False)
+
 			#first, check if a user uses this email
 			if User.objects.filter(email=email):
 				raise CustomBadRequest(code=-1, 
@@ -268,6 +475,9 @@ class RegisterUserResource(ModelResource):
 
 			#if passed all checks create user
 			bundle.obj = User.objects.create_user(username, email, password)
+			if is_fbook:
+				bundle.obj.userprofile.facebook_user = is_fbook
+				bundle.obj.userprofile.save()
 
 		except KeyError as missing_key:
 			raise CustomBadRequest(code=-10,
@@ -332,3 +542,4 @@ api_key[0].key = api_key.generate_key()
 api_key.save()
 
 """
+
