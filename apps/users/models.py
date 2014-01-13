@@ -148,15 +148,15 @@ class UserProfile(TimeStampedModel):
 		challenges = ChallengeResults.objects.filter(player=self.user).select_related()
 		for challenge in challenges:
 			blob = {
-			   'challenge':{
-			      'id': challenge.challenge.challenge_id,
-				  'media_type': challenge.challenge.media_type,
-				  'challenge_type': challenge.challenge.challenge_type,
-			      'challenge_created': challenge.challenge.created_on,
-				  'name': challenge.challenge.name,
-				  'result':{
-				   	     'success': challenge.success,
-				         'sender': challenge.challenge.sender.username}
+		   'challenge':{
+		      'id': challenge.challenge.challenge_id,
+			  'media_type': challenge.challenge.media_type,
+			  'challenge_type': challenge.challenge.challenge_type,
+		      'challenge_created': challenge.challenge.created_on,
+			  'name': challenge.challenge.name,
+			  'result':{
+			   	     'success': challenge.success,
+			         'sender': challenge.challenge.sender.username}
 				          }
 				}
 			my_list.append(blob)
