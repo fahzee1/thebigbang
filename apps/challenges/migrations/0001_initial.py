@@ -11,21 +11,61 @@ class Migration(SchemaMigration):
         # Adding model 'Challenge'
         db.create_table(u'challenges_challenge', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('created_on', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
+            ('created_on', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime(2014, 1, 14, 0, 0), auto_now_add=True, blank=True)),
             ('sender', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
-            ('challenge_id', self.gf('django.db.models.fields.CharField')(max_length=255)),
-            ('challenge_media', self.gf('django.db.models.fields.files.FileField')(max_length=100)),
+            ('name', self.gf('django.db.models.fields.CharField')(default='level 1', max_length=255, null=True, blank=True)),
+            ('challenge_id', self.gf('django.db.models.fields.CharField')(unique=True, max_length=255)),
+            ('media_data', self.gf('django.db.models.fields.BinaryField')()),
             ('media_type', self.gf('django.db.models.fields.IntegerField')(default=0)),
             ('challenge_type', self.gf('django.db.models.fields.IntegerField')(default=0)),
             ('answer', self.gf('django.db.models.fields.CharField')(max_length=255)),
             ('hint', self.gf('django.db.models.fields.CharField')(max_length=255, null=True, blank=True)),
+            ('active', self.gf('django.db.models.fields.BooleanField')(default=True)),
         ))
         db.send_create_signal(u'challenges', ['Challenge'])
+
+        # Adding model 'ChallengeResults'
+        db.create_table(u'challenges_challengeresults', (
+            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('created_on', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime(2014, 1, 14, 0, 0), auto_now_add=True, blank=True)),
+            ('challenge', self.gf('django.db.models.fields.related.ForeignKey')(related_name='results', to=orm['challenges.Challenge'])),
+            ('player', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
+            ('success', self.gf('django.db.models.fields.BooleanField')(default=False)),
+        ))
+        db.send_create_signal(u'challenges', ['ChallengeResults'])
+
+        # Adding model 'ChallengeSend'
+        db.create_table(u'challenges_challengesend', (
+            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('created_on', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime(2014, 1, 14, 0, 0), auto_now_add=True, blank=True)),
+            ('sender', self.gf('django.db.models.fields.related.ForeignKey')(related_name='sent_from', to=orm['auth.User'])),
+            ('challenge', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['challenges.Challenge'])),
+            ('retry', self.gf('django.db.models.fields.BooleanField')(default=False)),
+        ))
+        db.send_create_signal(u'challenges', ['ChallengeSend'])
+
+        # Adding M2M table for field recipients on 'ChallengeSend'
+        m2m_table_name = db.shorten_name(u'challenges_challengesend_recipients')
+        db.create_table(m2m_table_name, (
+            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
+            ('challengesend', models.ForeignKey(orm[u'challenges.challengesend'], null=False)),
+            ('user', models.ForeignKey(orm[u'auth.user'], null=False))
+        ))
+        db.create_unique(m2m_table_name, ['challengesend_id', 'user_id'])
 
 
     def backwards(self, orm):
         # Deleting model 'Challenge'
         db.delete_table(u'challenges_challenge')
+
+        # Deleting model 'ChallengeResults'
+        db.delete_table(u'challenges_challengeresults')
+
+        # Deleting model 'ChallengeSend'
+        db.delete_table(u'challenges_challengesend')
+
+        # Removing M2M table for field recipients on 'ChallengeSend'
+        db.delete_table(db.shorten_name(u'challenges_challengesend_recipients'))
 
 
     models = {
@@ -60,15 +100,34 @@ class Migration(SchemaMigration):
         },
         u'challenges.challenge': {
             'Meta': {'object_name': 'Challenge'},
+            'active': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
             'answer': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'challenge_id': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'challenge_media': ('django.db.models.fields.files.FileField', [], {'max_length': '100'}),
+            'challenge_id': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255'}),
             'challenge_type': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
-            'created_on': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'created_on': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime(2014, 1, 14, 0, 0)', 'auto_now_add': 'True', 'blank': 'True'}),
             'hint': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'media_data': ('django.db.models.fields.BinaryField', [], {}),
             'media_type': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
+            'name': ('django.db.models.fields.CharField', [], {'default': "'level 1'", 'max_length': '255', 'null': 'True', 'blank': 'True'}),
             'sender': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['auth.User']"})
+        },
+        u'challenges.challengeresults': {
+            'Meta': {'object_name': 'ChallengeResults'},
+            'challenge': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'results'", 'to': u"orm['challenges.Challenge']"}),
+            'created_on': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime(2014, 1, 14, 0, 0)', 'auto_now_add': 'True', 'blank': 'True'}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'player': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['auth.User']"}),
+            'success': ('django.db.models.fields.BooleanField', [], {'default': 'False'})
+        },
+        u'challenges.challengesend': {
+            'Meta': {'object_name': 'ChallengeSend'},
+            'challenge': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['challenges.Challenge']"}),
+            'created_on': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime(2014, 1, 14, 0, 0)', 'auto_now_add': 'True', 'blank': 'True'}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'recipients': ('django.db.models.fields.related.ManyToManyField', [], {'to': u"orm['auth.User']", 'symmetrical': 'False'}),
+            'retry': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'sender': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'sent_from'", 'to': u"orm['auth.User']"})
         },
         u'contenttypes.contenttype': {
             'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},

@@ -8,7 +8,7 @@ from tastypie.utils import trailing_slash
 from tastypie.resources import ModelResource
 from django.contrib.auth.models import User
 from django.core.files import File
-from models import Challenge
+from models import Challenge, ChallengeResults
 from apps.users.exceptions import CustomBadRequest
 from tastypie.authorization import DjangoAuthorization, Authorization
 from tastypie.authentication import BasicAuthentication, ApiKeyAuthentication, MultiAuthentication, Authentication
@@ -16,6 +16,7 @@ from tastypie.validation import Validation
 from tastypie import fields
 from django.core.files.base import ContentFile
 
+responder = {}
 
 class ChallengeValidation(Validation):
 
@@ -33,7 +34,8 @@ class ChallengeValidation(Validation):
 
 class ChallengeResource(ModelResource):
     """
-    Create challenge
+    Create challenge:
+    POST to /api/v1/challenge
 
     {
       "username":"user",
@@ -47,16 +49,26 @@ class ChallengeResource(ModelResource):
       "challenge_type":"type"
     }
 
-     Send Challenge:
+     Send challenge:
      POST to /api/v1/send
-     challenge_id param:
-         -id of challenge
-     recipients:
-         -list of userames to send to
+    
+    {
+      "challenge_id":"id",
+      "recipients":["user", "user2", "user3"],
+      "username":"user"
+    }
 
-    {"challenge_id":"id",
-    "recipients":["user", "user2", "user3"],
-    "username":"user"
+    Send challenge results:
+    POST to /api/v1/results
+    success:
+         -yes or no
+
+
+    {
+      "username":"user",
+      "challenge_id":"id",
+      "success":"yes",
+    
     }
 
     Will send media data as gzipped base64 data
@@ -84,10 +96,65 @@ class ChallengeResource(ModelResource):
         return [
                 url(r'^send%s$' %(trailing_slash()),
                     self.wrap_view('send_challenge'), name='api_send'),
-                 url(r'^blob%s$' %(trailing_slash()),
+                url(r'^blob%s$' %(trailing_slash()),
                     self.wrap_view('get_blob'), name='api_blob'),
+                url(r'^results%s$' %(trailing_slash()),
+                    self.wrap_view('send_results'), name='api_results'),
                 ]
 
+
+    def send_results(self, request, **kwargs):
+        self.method_check(request, allowed=['post'])
+        data = self.deserialize(request, 
+                                request.body,
+                                format=request.META.get('CONTENT_TYPE', 'application/json'))
+        username = data.get('username', None)
+        challenge_id = data.get('challenge_id', None)
+        success = data.get('success', None)
+        if not username:
+            raise CustomBadRequest(code=-1,
+                                   message='Must provide username when sending challenge results!',
+                                   my_error=True)
+
+        if not challenge_id:
+            raise CustomBadRequest(code=-1,
+                                   message='Must provide challenge id when sending challenge results!',
+                                   my_error=True)
+
+        if not success:
+            raise CustomBadRequest(code=-1,
+                                   message='Must provide success when sending challenge results!',
+                                   my_error=True)
+
+        try:
+            challenge = Challenge.objects.get(challenge_id=challenge_id)
+        except Challenge.DoesNotExist:
+            raise CustomBadRequest(code=-10,
+                                   message="Challenge doesnt exist!",
+                                   my_error=True)
+
+        try:
+            sender = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise CustomBadRequest(code=-10,
+                                   message="User doesnt exist!",
+                                   my_error=True)
+
+        success = (True if success == 'yes' else False)
+        try:
+            results = ChallengeResults.objects.create(
+                                            player=sender,
+                                            challenge=challenge,
+                                            success=success)
+            responder['code'] = 1
+            responder['message'] = 'Successfully sent challenge results'
+            return self.create_response(request,responder)
+        except:
+            raise CustomBadRequest(code=-10,
+                                   message="Error creating challenge results!",
+                                   my_error=True)
+
+    
 
     def get_blob(self, request, **kwargs):
         self.method_check(request, allowed=['post'])

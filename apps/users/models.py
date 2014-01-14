@@ -10,6 +10,7 @@ from django.core import serializers
 from tastypie.utils.timezone import now
 from apps.challenges.models import Challenge, ChallengeResults, TimeStampedModel
 from utils import ENCRYPT_KEY, encode, decode
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 
@@ -26,6 +27,12 @@ class Friends(TimeStampedModel):
     def __unicode__(self):
         return "%s is friends with %s" %(self.friend, self.user)
 
+    def save(self, *args, **kwargs):
+        if self.user.username == self.friend.username:
+            raise ValidationError('%s cant be friends with %s' % (self.user.username, self.friend.username))
+
+        super(Friends,self).save(*args, **kwargs)
+
 
 
 class UserProfile(TimeStampedModel):
@@ -34,7 +41,7 @@ class UserProfile(TimeStampedModel):
     phone_number = models.CharField(max_length=255, blank=True, null=True)
     facebook_user = models.BooleanField(default=False , blank=True)
     last_activity = models.DateTimeField(default=now,auto_now_add=True)
-    device_token = models.CharField(default="",max_length=255)
+    device_token = models.CharField(default="",max_length=255, null=True)
     privacy = models.IntegerField(default=0)
     sent_challenges = models.IntegerField(default=0)
 
