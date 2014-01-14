@@ -84,6 +84,7 @@ class UserProfileResource(ModelResource):
          -add
          -delete
          -display
+         -getFP (Friends Profile)
      friend param:
          -user
 
@@ -222,9 +223,22 @@ class UserProfileResource(ModelResource):
                                        message='Friend doesnt exist!',
                                        my_error=True)
 
+        if action == 'getFP':
+            try:
+                friend = Friends.objects.get(user=me, friend=friend)
+                return self.create_response(request, friend.profile)
+
+            except:
+                raise CustomBadRequest(code=-10,
+                                       message='Friend doesnt exist!',
+                                       my_error=True)
 
 
-        if action != 'add' and action != 'delete' and action != 'display':
+
+        if action != 'add' and \
+           action != 'delete' and \
+           action != 'getFP' and \
+           action != 'display':
             raise CustomBadRequest(code=-1,
                                    message="Action parameter should be either 'add', 'delete' or 'display ",
                                    my_error=True)

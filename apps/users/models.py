@@ -33,6 +33,19 @@ class Friends(TimeStampedModel):
 
         super(Friends,self).save(*args, **kwargs)
 
+    def profile_grab(self):
+        blob = {
+            'code':1,
+            'friend':{
+                'username': self.friend.username,
+                'display_name' : self.display_name,
+                'friends_last_activity': self.friend.userprofile.last_activity,
+                'friends_score': self.friend.userprofile.score,
+            }
+        }
+        return json.dumps(blob, cls=DjangoJSONEncoder)
+    profile = property(profile_grab)
+
 
 
 class UserProfile(TimeStampedModel):
@@ -129,7 +142,10 @@ class UserProfile(TimeStampedModel):
         """
         
         my_list = []
-        blob = {'results':[]}
+        blob = {
+            'code':1,
+            'results':[]
+            }
         challenges = Challenge.objects.filter(sender=self.user).select_related()
         for challenge in challenges:
             blob['id'] = challenge.challenge_id
