@@ -28,5 +28,5 @@ def decode(key, enc):
     return "".join(dec)
 
 # securly store this somewhere
-ENCRYPT_KEY = '0e568a1a226eaa669cb30cd7d37d3e376f45b6ab9de9fe1a600e6e02'
+PHONE_KEY = 'phone-0e568a1a226eaa669cb30'
 

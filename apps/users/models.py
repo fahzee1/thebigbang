@@ -9,8 +9,9 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.core import serializers
 from tastypie.utils.timezone import now
 from apps.challenges.models import Challenge, ChallengeResults, TimeStampedModel
-from utils import ENCRYPT_KEY, encode, decode
+from utils import PHONE_KEY, encode, decode
 from django.core.exceptions import ValidationError
+
 
 # Create your models here.
 
@@ -87,7 +88,7 @@ class UserProfile(TimeStampedModel):
         profile_json['friend_requests'] = self.friend_requests
         profile_json['my_challenges'] = self.my_challenges
         profile_json['received_challenges'] = self.received_challenges
-        profile_json['phone_number'] = decode(ENCRYPT_KEY, str(profile_json['phone_number']))
+        profile_json['phone_number'] = decode(PHONE_KEY, str(profile_json['phone_number']))
 
         if login:
             profile_json['code'] = 11
@@ -100,20 +101,48 @@ class UserProfile(TimeStampedModel):
         Returns json of all users friends
         """
         # or use UserObject.friend_creator_set.filter(user=self)
-        my_list = []
-        blob = {}
+        blob = {'friends':[]}
         friends = Friends.objects.filter(user=self.user).select_related()
         for friend in friends:
-            blob['username'] = friend.friend.username
-            blob['display_name'] = friend.display_name
-            blob['friend_created'] = friend.created_on
-            blob['friends_score'] = friend.friend.userprofile.score
-            blob['friends_last_activity'] = friend.friend.userprofile.last_activity
-            my_list.append(blob)
+            friend_blob = {
+                    'username': friend.friend.username,
+                    'display_name': friend.display_name,
+                    'friend_created': friend.created_on,
+                    'friends_score': friend.friend.userprofile.score,
+                    'friends_last_activity': friend.friend.userprofile.last_activity
+                     }
+            blob['friends'].append(friend_blob)
 
-        return json.dumps(my_list, cls=DjangoJSONEncoder)
+        return json.dumps(blob, cls=DjangoJSONEncoder)
 
     friends = property(my_friends)
+
+
+    @staticmethod
+    def get_contact_friends(numbers=[]):
+        """
+        Returns json of all friends matched by 
+        phone_numbers
+        """
+        blob = {'contacts':[]}
+        for contact in numbers:
+            try:
+                encrypted_number = encode(PHONE_KEY,contact)
+                friend = UserProfile.objects.select_related('User').get(phone_number=encrypted_number)
+                contact_blob = {
+                          'username': friend.user.username,
+                          'display_name': friend.user.username,
+                          'friends_score': friend.score,
+                          'friends_last_activity': friend.last_activity
+                                }
+                blob['contacts'].append(contact_blob)
+            except UserProfile.DoesNotExist:
+                pass
+
+        return json.dumps(blob, cls=DjangoJSONEncoder)
+
+
+
 
     def my_requests(self):
         """
@@ -162,7 +191,6 @@ class UserProfile(TimeStampedModel):
 
         return json.dumps(my_list, cls=DjangoJSONEncoder)
 
-
     my_challenges = property(my_challenges)
 
 
@@ -192,6 +220,41 @@ class UserProfile(TimeStampedModel):
 
 
     received_challenges = property(received_challenges)
+
+    """
+    def updates(self, timestamp):
+        blob = {'new_friends':[],
+                'new_challenges':
+                   {
+                    'created':[],
+                    'received':[]
+                    }
+                }
+        new_friends = Friends.objects.filter(user=self.user,created_on__gt=timestamp).select_related()
+        created_challenges = ChallengeResults.objects.filter(challenge__sender=self.user, 
+                                                        player=self.user,created_on__gt=timestamp).select_related()
+
+        if new_friends:
+            for friend in new_friends:
+                friend_blob = {
+                        'username': friend.friend.username,
+                        'display_name': friend.display_name,
+                        'friends_score': friend.friend.userprofile.score,
+                        'friend_created': friend.created_on,
+                        'friends_last_activity': friend.friend.userprofile.last_activity
+                }
+                blob['new_friends'].append(friend_blob)
+
+        if created_challenges:
+            for challenge in created_challenges:
+                if challenge.player = self.user:
+
+                if challenge.challenge.sender = self.user:
+
+
+        return json.dumps(blob, cls=DjangoJSONEncoder)
+        """
+
 
 
 
