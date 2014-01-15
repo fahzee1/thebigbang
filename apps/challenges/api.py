@@ -140,7 +140,9 @@ class ChallengeResource(ModelResource):
                                    message="User doesnt exist!",
                                    my_error=True)
 
+        # did user win or lose challenge?  
         success = (True if success == 'yes' else False)
+        # create challenge results and return success
         try:
             results = ChallengeResults.objects.create(
                                             player=sender,
@@ -224,6 +226,7 @@ class ChallengeResource(ModelResource):
                                    message='Challenge Doesnt exist! Thats your fault CJ!',
                                    my_error=True)
 
+        # create challenge send and add all recievers from recipients list
         try:
             send = ChallengeSend()
             send.sender = sender

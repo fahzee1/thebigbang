@@ -171,7 +171,9 @@ class UserProfileResource(ModelResource):
             raise CustomBadRequest(code=-10,
                                    message='User Doesnt exist! Thats your fault CJ!',
                                    my_error=True)
-        if action != 'getCF':
+
+        # only need to get friend if grabbing profile or grabbing contacts
+        if action != 'getCF' or action != 'getFP':
             try:
                 friend = User.objects.get(username=friend)
             except User.DoesNotExist:
@@ -179,6 +181,7 @@ class UserProfileResource(ModelResource):
                                        message='Friend Doesnt exist! Thats your fault CJ!',
                                        my_error=True)
 
+        # grab contact friends from list of usernames
         if action == 'getCF':
             if not content:
                 raise CustomBadRequest(code=-1,
@@ -191,7 +194,19 @@ class UserProfileResource(ModelResource):
             except:
                 raise CustomBadRequest(code=-1,
                                        message='Not sure what the error is but needs to be fixed!')
-                
+
+        # grab a friends profile based on username
+        if action == 'getFP':
+            try:
+                friend = Friends.objects.get(user=me, friend=friend)
+                return self.create_response(request, friend.profile)
+
+            except:
+                raise CustomBadRequest(code=-10,
+                                       message='Friend doesnt exist!',
+                                       my_error=True)
+
+        # add a friend based on username
         if action == 'add':
             if Friends.objects.filter(user=me, friend=friend):
                 raise CustomBadRequest(code=-1,
@@ -209,7 +224,7 @@ class UserProfileResource(ModelResource):
                                            message='Error creating friendship',
                                            my_error=True)
 
-
+        # delete a friend based on username
         if action == 'delete':
             try:
                 friendship = Friends.objects.get(user=me, friend=friend)
@@ -222,6 +237,7 @@ class UserProfileResource(ModelResource):
                                        message='Friend already deleted',
                                        my_error=True)
 
+        # edit a friends display name based on username
         if action == 'display':
             if not content:
                 raise CustomBadRequest(code=-1,
@@ -239,17 +255,7 @@ class UserProfileResource(ModelResource):
                                        message='Friend doesnt exist!',
                                        my_error=True)
 
-        if action == 'getFP':
-            try:
-                friend = Friends.objects.get(user=me, friend=friend)
-                return self.create_response(request, friend.profile)
-
-            except:
-                raise CustomBadRequest(code=-10,
-                                       message='Friend doesnt exist!',
-                                       my_error=True)
-
-
+        # assert valid action param sent
         if action != 'add' and \
            action != 'delete' and \
            action != 'display' and \
@@ -331,7 +337,9 @@ class UserProfileResource(ModelResource):
                                  message='User Doesnt exist! Thats your fault CJ!',
                                  my_error=True)
 
+        # each action param should sent content to update/edit
         new_content = data.get('content',None)
+        
         if action == 'updateEmail':
             user.email = new_content
             try:
@@ -354,10 +362,8 @@ class UserProfileResource(ModelResource):
                 raise CustomBadRequest(code=-1, 
                                     message='Failed to update username. Type new name and try again')
 
+        # encode phone number using phone key
         if action == 'updatePhoneNumber':
-            #store hash of phone number
-            #dont forget to decode when needed
-            #base64.b64decode(hash)
             user.userprofile.phone_number = encode(PHONE_KEY,new_content)
             try:
                 user.userprofile.save()
@@ -379,6 +385,7 @@ class UserProfileResource(ModelResource):
                 raise CustomBadRequest(code=-1, 
                                     message='Failed to update privacy. Please try again')
 
+        # assert valid action param sent
         if action != 'updatePrivacy' and \
            action != 'updateEmail' and \
            action != 'updateUsername' and \
