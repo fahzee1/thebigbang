@@ -142,6 +142,7 @@ class UserProfileResource(ModelResource):
 
     def friends(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
         data = self.deserialize(request, 
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))

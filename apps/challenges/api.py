@@ -105,6 +105,7 @@ class ChallengeResource(ModelResource):
 
     def send_results(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
         data = self.deserialize(request, 
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
@@ -160,6 +161,7 @@ class ChallengeResource(ModelResource):
 
     def get_blob(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
         data = self.deserialize(request, 
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
@@ -191,6 +193,7 @@ class ChallengeResource(ModelResource):
 
     def send_challenge(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
         data = self.deserialize(request, 
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
