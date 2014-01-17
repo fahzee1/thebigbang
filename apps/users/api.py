@@ -272,7 +272,7 @@ class UserProfileResource(ModelResource):
 
     def login(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
-        
+        self.is_authenticated(request)
         data = self.deserialize(request,
                                 request.body,   
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
@@ -305,6 +305,7 @@ class UserProfileResource(ModelResource):
 
     def logout(self, request, **kwargs):
         self.method_check(request, allowed=['get'])
+        self.is_authenticated(request)
         if request.user and request.user.is_authenticated():
             logout(request)
             responder['code'] = 1
@@ -318,6 +319,7 @@ class UserProfileResource(ModelResource):
 
     def settings(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
         data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
         username = data.get('username',None)
         action = data.get('action',None)
