@@ -279,8 +279,11 @@ class UserProfileResource(ModelResource):
         if user:
             if user.is_active:
                 login(request, user)
-                return self.create_response(request,
+                try:
+                    return self.create_response(request,
                                             user.userprofile.return_json(login=True))
+                except:
+                    traceback.print_exc()
             else:
                 raise CustomBadRequest(code=-1, 
                                     message='Inactive user')
@@ -509,7 +512,17 @@ class RegisterUserResource(ModelResource):
 
 
 from django.db import models
-from models import create_profile, create_api_key
+from tastypie.models import ApiKey
+
+def create_profile(sender, **kwargs):
+    if kwargs['created']:
+        UserProfile.objects.get_or_create(user=kwargs['instance'])
+
+def create_api_key(sender, **kwargs):
+    if kwargs['created']:
+        ApiKey.objects.get_or_create(user=kwargs['instance'])
+
+
 
 #create api key
 models.signals.post_save.connect(create_api_key, sender=User)

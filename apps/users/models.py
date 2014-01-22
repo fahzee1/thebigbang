@@ -68,6 +68,7 @@ class UserProfile(TimeStampedModel):
         creating json response that mirrors that
         of django tastypie for custom login method
         """
+
         profile_data = serializers.serialize('json',[self,self.user])
         p_json = json.loads(profile_data)
         profile_json = p_json[0]['fields']
@@ -95,6 +96,7 @@ class UserProfile(TimeStampedModel):
             profile_json['message'] = 'Login was successful.'
 
         return profile_json
+
 
     def my_friends(self):
         """
@@ -259,18 +261,6 @@ class UserProfile(TimeStampedModel):
 
 
 
-
-
-
-from tastypie.models import create_api_key, ApiKey
-
-def create_profile(sender, **kwargs):
-    if kwargs['created']:
-        UserProfile.objects.get_or_create(user=kwargs['instance'])
-
-def create_api_key(sender, **kwargs):
-    if kwargs['created']:
-        ApiKey.objects.get_or_create(user=kwargs['instance'])
 
 
 
