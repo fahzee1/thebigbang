@@ -91,7 +91,7 @@ class UserProfile(TimeStampedModel):
         profile_json['phone_number'] = decode(PHONE_KEY, str(profile_json['phone_number']))
 
         if login:
-            profile_json['code'] = 11
+            profile_json['code'] = 1
             profile_json['message'] = 'Login was successful.'
 
         return profile_json
@@ -262,11 +262,16 @@ class UserProfile(TimeStampedModel):
 
 
 
+from tastypie.models import create_api_key, ApiKey
 
-
-def create_profile(sender,**kwargs):
+def create_profile(sender, **kwargs):
     if kwargs['created']:
-        UserProfile.objects.create(user=kwargs['instance'])
+        UserProfile.objects.get_or_create(user=kwargs['instance'])
+
+def create_api_key(sender, **kwargs):
+    if kwargs['created']:
+        ApiKey.objects.get_or_create(user=kwargs['instance'])
+
 
 
 """

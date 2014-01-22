@@ -1,12 +1,11 @@
 import json
 from tastypie.exceptions import TastypieError
-from tastypie.http import HttpBadRequest , HttpApplicationError
+from django.http import HttpResponse
 
 
 class CustomBadRequest(TastypieError):
 
-    def __init__(self, code="", message="", my_error=False):
-        self.application_error = my_error
+    def __init__(self, code="", message=""):
         self._response = { 
                     "code": code or "not_provided",
                     "message": message or "No error message was provided"
@@ -14,10 +13,7 @@ class CustomBadRequest(TastypieError):
 
     @property 
     def response(self):
-        if self.application_error:
-            return HttpApplicationError(json.dumps(self._response), content_type="application/json")
-        else:
-            return HttpBadRequest(json.dumps(self._response),content_type="application/json")
+        return HttpResponse(json.dumps(self._response),content_type="application/json")
 
 
 

@@ -1,6 +1,7 @@
 import pdb
 import json
 import base64
+import traceback
 from tastypie.resources import ModelResource
 from tastypie.authorization import DjangoAuthorization, Authorization
 from django.contrib.auth.models import User
@@ -151,27 +152,23 @@ class UserProfileResource(ModelResource):
         action = data.get('action', None)
         content = data.get('content', None)
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when updating friends!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when updating friends!')
 
         if not action:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide action when updating friends or retrieving friends',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide action when updating friends or retrieving friends')
 
         if action != 'getCF':
             if not friend:
-                raise CustomBadRequest(code=-1,
-                                       message='Must provide friend when updating friends',
-                                       my_error=True)
+                raise CustomBadRequest(code=-10,
+                                       message='Must provide friend when updating friends')
 
         try:
             me = User.objects.get(username=username)
         except User.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
+                                   message='User Doesnt exist! Thats your fault CJ!')
 
         # only need to get friend if grabbing profile or grabbing contacts
         if action != 'getCF' or action != 'getFP':
@@ -179,21 +176,19 @@ class UserProfileResource(ModelResource):
                 friend = User.objects.get(username=friend)
             except User.DoesNotExist:
                 raise CustomBadRequest(code=-10,
-                                       message='Friend Doesnt exist! Thats your fault CJ!',
-                                       my_error=True)
+                                       message='Friend Doesnt exist! Thats your fault CJ!')
 
         # grab contact friends from list of usernames
         if action == 'getCF':
             if not content:
-                raise CustomBadRequest(code=-1,
-                                       message='Must provide content when getting contact friends!',
-                                       my_error=True)
+                raise CustomBadRequest(code=-10,
+                                       message='Must provide content when getting contact friends!')
             content = list(content)
             try:
                 friends = UserProfile.get_contact_friends(content)
                 return self.create_response(request,friends)
             except:
-                raise CustomBadRequest(code=-1,
+                raise CustomBadRequest(code=-10,
                                        message='Not sure what the error is but needs to be fixed!')
 
         # grab a friends profile based on username
@@ -204,13 +199,12 @@ class UserProfileResource(ModelResource):
 
             except:
                 raise CustomBadRequest(code=-10,
-                                       message='Friend doesnt exist!',
-                                       my_error=True)
+                                       message='Friend doesnt exist!')
 
         # add a friend based on username
         if action == 'add':
             if Friends.objects.filter(user=me, friend=friend):
-                raise CustomBadRequest(code=-1,
+                raise CustomBadRequest(code=-10,
                                        message='Friendship already exists')
             else:
                 try:
@@ -221,9 +215,8 @@ class UserProfileResource(ModelResource):
                     responder['message'] = 'Successfully added friend!'
                     return self.create_response(request, responder)
                 except:
-                    raise CustomBadRequest(code=-1,
-                                           message='Error creating friendship',
-                                           my_error=True)
+                    raise CustomBadRequest(code=-10,
+                                           message='Error creating friendship')
 
         # delete a friend based on username
         if action == 'delete':
@@ -235,15 +228,13 @@ class UserProfileResource(ModelResource):
                 return self.create_response(request, responder)
             except Friends.DoesNotExist:
                 raise CustomBadRequest(code=-10,
-                                       message='Friend already deleted',
-                                       my_error=True)
+                                       message='Friend already deleted')
 
         # edit a friends display name based on username
         if action == 'display':
             if not content:
-                raise CustomBadRequest(code=-1,
-                                       message='Must provide content when updating friends display name!',
-                                       my_error=True)
+                raise CustomBadRequest(code=-10,
+                                       message='Must provide content when updating friends display name!')
             try:
                 friend = Friends.objects.get(user=me, friend=friend)
                 friend.display_name = content
@@ -253,8 +244,7 @@ class UserProfileResource(ModelResource):
                 return self.create_response(request, responder)
             except Friends.DoesNotExist:
                 raise CustomBadRequest(code=-10,
-                                       message='Friend doesnt exist!',
-                                       my_error=True)
+                                       message='Friend doesnt exist!')
 
         # assert valid action param sent
         if action != 'add' and \
@@ -266,8 +256,7 @@ class UserProfileResource(ModelResource):
             raise CustomBadRequest(code=-1,
                                    message="""
                                           Action parameter should be either 'add', 
-                                          'delete', 'display', or 'getCF' """,
-                                    my_error=True)
+                                          'delete', 'display', or 'getCF' """)
 
 
     def login(self, request, **kwargs):
@@ -279,20 +268,17 @@ class UserProfileResource(ModelResource):
         username = data.get('username', None)
         password = data.get('password', None)
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when logging in!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when logging in!')
 
         if not password:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide password when logging in!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide password when logging in!')
 
         user = authenticate(username=username, password=password)
         if user:
             if user.is_active:
                 login(request, user)
-                responder['code'] = 1
                 return self.create_response(request,
                                             user.userprofile.return_json(login=True))
             else:
@@ -300,7 +286,7 @@ class UserProfileResource(ModelResource):
                                     message='Inactive user')
         else:
             raise CustomBadRequest(code=-1, 
-                                message='Incorrect user or password')
+                                message='Incorrect username or password')
 
 
     def logout(self, request, **kwargs):
@@ -324,21 +310,18 @@ class UserProfileResource(ModelResource):
         username = data.get('username',None)
         action = data.get('action',None)
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when updating settings!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when updating settings!')
 
         if not action:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide action when updating settings!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide action when updating settings!')
 
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                 message='User Doesnt exist! Thats your fault CJ!',
-                                 my_error=True)
+                                 message='User Doesnt exist! Thats your fault CJ!')
 
         # each action param should sent content to update/edit
         new_content = data.get('content',None)
@@ -480,7 +463,9 @@ class RegisterUserResource(ModelResource):
                 raise CustomBadRequest(code=-1, message="Your password should contain"
                                                     " at least %d characters" % MINIMUM_PASSWORD_LENGTH)
 
+
             #if passed all checks create user
+            #pdb.set_trace()
             bundle.obj = User.objects.create_user(username, email, password)
             if is_fbook:
                 bundle.obj.userprofile.facebook_user = is_fbook
@@ -488,13 +473,12 @@ class RegisterUserResource(ModelResource):
 
         except KeyError as missing_key:
             raise CustomBadRequest(code=-10,
-                                message="Must provide %s when creating User CJ!" % missing_key,
-                                 my_error=True)
+                                message="Must provide %s when creating User CJ!" % missing_key)
 
         except IntegrityError:
-            raise CustomBadRequest(code=-10, message="Username already exists."
-                                                " Shouldnt be seeing this message though!",
-                                             my_error=True)
+            traceback.print_exc()
+            raise CustomBadRequest(code=-10, message="Username/password/email error."
+                                                " Did you enter your email correctly?")
 
         return bundle
 
@@ -506,6 +490,7 @@ class RegisterUserResource(ModelResource):
 
         bundle.data['api_key'] = bundle.obj.api_key.key
         bundle.data['userID'] = bundle.obj.id
+        bundle.data['code'] = 1
 
         try:
             del bundle.data['password']
@@ -524,8 +509,7 @@ class RegisterUserResource(ModelResource):
 
 
 from django.db import models
-from tastypie.models import create_api_key
-from models import create_profile
+from models import create_profile, create_api_key
 
 #create api key
 models.signals.post_save.connect(create_api_key, sender=User)

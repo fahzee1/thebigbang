@@ -113,33 +113,28 @@ class ChallengeResource(ModelResource):
         challenge_id = data.get('challenge_id', None)
         success = data.get('success', None)
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when sending challenge results!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when sending challenge results!')
 
         if not challenge_id:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge id when sending challenge results!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide challenge id when sending challenge results!')
 
         if not success:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide success when sending challenge results!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide success when sending challenge results!')
 
         try:
             challenge = Challenge.objects.get(challenge_id=challenge_id)
         except Challenge.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message="Challenge doesnt exist!",
-                                   my_error=True)
+                                   message="Challenge doesnt exist!")
 
         try:
             sender = User.objects.get(username=username)
         except User.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message="User doesnt exist!",
-                                   my_error=True)
+                                   message="User doesnt exist!")
 
         # did user win or lose challenge?  
         success = (True if success == 'yes' else False)
@@ -154,8 +149,7 @@ class ChallengeResource(ModelResource):
             return self.create_response(request,responder)
         except:
             raise CustomBadRequest(code=-10,
-                                   message="Error creating challenge results!",
-                                   my_error=True)
+                                   message="Error creating challenge results!")
 
     
 
@@ -168,14 +162,12 @@ class ChallengeResource(ModelResource):
         username = data.get('username', None)
         challenge_id = data.get('challenge_id', None)
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when sending challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when sending challenge!')
 
         if not challenge_id:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge id when sending challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide challenge id when sending challenge!')
 
         try:
             challenge = Challenge.objects.get(challenge_id=challenge_id)
@@ -187,8 +179,7 @@ class ChallengeResource(ModelResource):
                                        message='Challenge no longer active')
         except Challenge.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message="Challenge doest exist!",
-                                   my_error=True)
+                                   message="Challenge doest exist!")
 
 
     def send_challenge(self, request, **kwargs):
@@ -201,33 +192,28 @@ class ChallengeResource(ModelResource):
         challenge_id = data.get('challenge_id', None)
         recipients = data.get('recipients', None) 
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when sending challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when sending challenge!')
 
         if not challenge_id:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge id when sending challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide challenge id when sending challenge!')
 
         if not recipients:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide recipients when sending challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide recipients when sending challenge!')
 
         try:
             sender = User.objects.get(username=username)
         except User.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
+                                   message='User Doesnt exist! Thats your fault CJ!')
 
         try:
             challenge = Challenge.objects.get(challenge_id=challenge_id)
         except Challenge.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message='Challenge Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
+                                   message='Challenge Doesnt exist! Thats your fault CJ!')
 
         # create challenge send and add all recievers from recipients list
         try:
@@ -241,16 +227,14 @@ class ChallengeResource(ModelResource):
                     send.recipients.add(user)
                 except User.DoesNotExist:
                     raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
+                                   message='User Doesnt exist! Thats your fault CJ!')
             responder['code'] = 1
             responder['message'] = 'Successfully sent challenge!'
             return self.create_response(request, responder)
 
         except:
             raise CustomBadRequest(code=-10,
-                                   message='Not sure what happened, but thats your fault CJ!',
-                                   my_error=True)
+                                   message='Not sure what happened, but thats your fault CJ!')
 
 
     def hydrate(self, bundle):
@@ -267,8 +251,7 @@ class ChallengeResource(ModelResource):
         for field in REQUIRED_CHALLENGE_FIELDS:
             if field not in bundle.data:
                 raise CustomBadRequest(code=-10,
-                                       message="Must provide %s when creating challenge" % field,
-                                       my_error=True)
+                                       message="Must provide %s when creating challenge" % field)
         return bundle
 
 
@@ -284,51 +267,42 @@ class ChallengeResource(ModelResource):
         gzip = bundle.data.get('gzip', None)
 
         if not username:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide username when creating a challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide username when creating a challenge!')
 
         if not challenge_type:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge_type when creating a challenge!',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide challenge_type when creating a challenge!')
 
         if not media_type:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide media_type value when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide media_type value when creating a challenge')
 
         if not name:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide name when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide name when creating a challenge')
         if not challenge_id:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide challenge_id when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide challenge_id when creating a challenge')
 
         if not answer:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide answer password when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide answer password when creating a challenge')
 
         if not media:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide media when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide media when creating a challenge')
 
         if not gzip:
-            raise CustomBadRequest(code=-1,
-                                   message='Must provide gzip value when creating a challenge',
-                                   my_error=True)
+            raise CustomBadRequest(code=-10,
+                                   message='Must provide gzip value when creating a challenge')
 
 
         try:
             creator = User.objects.get(username=username)
         except User.DoesNotExist:
             raise CustomBadRequest(code=-10,
-                                   message='User Doesnt exist! Thats your fault CJ!',
-                                   my_error=True)
+                                   message='User Doesnt exist! Thats your fault CJ!')
 
 
         try:
@@ -362,8 +336,7 @@ class ChallengeResource(ModelResource):
 
         except:
             raise CustomBadRequest(code=-10,
-                                  message='Not sure what happened, but its your fault CJ!',
-                                  my_error=True)
+                                  message='Not sure what happened, but its your fault CJ!')
 
         return bundle        
  
