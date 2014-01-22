@@ -55,7 +55,7 @@ class UserProfile(TimeStampedModel):
     phone_number = models.CharField(max_length=255, blank=True, null=True)
     facebook_user = models.BooleanField(default=False , blank=True)
     last_activity = models.DateTimeField(default=now,auto_now_add=True)
-    device_token = models.CharField(default="",max_length=255, null=True)
+    device_token = models.CharField(default="",max_length=255, blank=True, null=True)
     privacy = models.IntegerField(default=0)
     sent_challenges = models.IntegerField(default=0)
 
@@ -67,6 +67,7 @@ class UserProfile(TimeStampedModel):
         """
         creating json response that mirrors that
         of django tastypie for custom login method
+        * includes phone number if present
         """
 
         profile_data = serializers.serialize('json',[self,self.user])
@@ -89,8 +90,43 @@ class UserProfile(TimeStampedModel):
         profile_json['friend_requests'] = self.friend_requests
         profile_json['my_challenges'] = self.my_challenges
         profile_json['received_challenges'] = self.received_challenges
-        profile_json['phone_number'] = decode(PHONE_KEY, str(profile_json['phone_number']))
+        if self.phone_number:
+            profile_json['phone_number'] = decode(PHONE_KEY, str(profile_json['phone_number']))
 
+        if login:
+            profile_json['code'] = 1
+            profile_json['message'] = 'Login was successful.'
+
+        return profile_json
+
+    def __return_json(self, login=False):
+        """
+        creating json response that mirrors that
+        of django tastypie for custom login method
+        * doesnt include phone number
+        """
+
+        profile_data = serializers.serialize('json',[self,self.user])
+        p_json = json.loads(profile_data)
+        profile_json = p_json[0]['fields']
+        user_json = p_json[1]['fields']
+        try:
+            del user_json['is_active']
+            del user_json['is_superuser']
+            del user_json['is_staff']
+            del user_json['groups']
+            del user_json['user_permissions']
+            del user_json['password']
+        except KeyError:
+            pass
+
+
+        profile_json['user'] = user_json
+        profile_json['my_friends'] = self.friends
+        profile_json['friend_requests'] = self.friend_requests
+        profile_json['my_challenges'] = self.my_challenges
+        profile_json['received_challenges'] = self.received_challenges
+       
         if login:
             profile_json['code'] = 1
             profile_json['message'] = 'Login was successful.'

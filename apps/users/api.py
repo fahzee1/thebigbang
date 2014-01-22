@@ -280,10 +280,10 @@ class UserProfileResource(ModelResource):
             if user.is_active:
                 login(request, user)
                 try:
-                    return self.create_response(request,
-                                            user.userprofile.return_json(login=True))
+                    return self.create_response(request,user.userprofile.return_json(login=True))
                 except:
-                    traceback.print_exc()
+                    return self.create_response(request,user.userprofile.__return_json(login=True))
+
             else:
                 raise CustomBadRequest(code=-1, 
                                     message='Inactive user')
@@ -417,6 +417,7 @@ class RegisterUserResource(ModelResource):
      "email":"email",
      "password":"password",
      "fbook_user":"yes"
+     "phone_number":"555-555-5555"
      }
 
     """
@@ -448,6 +449,7 @@ class RegisterUserResource(ModelResource):
             username = bundle.data['username'] 
             email = bundle.data['email']
             password = bundle.data['password']
+            phone_number = bundle.data['phone_number']
             fbook = bundle.data['fbook_user']
             is_fbook = (True if fbook == 'yes' else False)
 
@@ -468,11 +470,13 @@ class RegisterUserResource(ModelResource):
 
 
             #if passed all checks create user
-            #pdb.set_trace()
             bundle.obj = User.objects.create_user(username, email, password)
             if is_fbook:
                 bundle.obj.userprofile.facebook_user = is_fbook
-                bundle.obj.userprofile.save()
+            if phone_number:
+                bundle.obj.userprofile.phone_number = encode(PHONE_KEY,phone_number)
+
+            bundle.obj.userprofile.save()
 
         except KeyError as missing_key:
             raise CustomBadRequest(code=-10,
