@@ -58,6 +58,7 @@ class UserProfile(TimeStampedModel):
     device_token = models.CharField(default="",max_length=255, blank=True, null=True)
     privacy = models.IntegerField(default=0)
     sent_challenges = models.IntegerField(default=0)
+    facebook_id = models.IntegerField(blank=True, null=True)
 
 
     def __unicode__(self):

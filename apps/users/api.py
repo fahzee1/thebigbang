@@ -417,7 +417,6 @@ class RegisterUserResource(ModelResource):
      "email":"email",
      "password":"password",
      "fbook_user":"yes"
-     "phone_number":"555-555-5555"
      }
 
     """
@@ -449,8 +448,8 @@ class RegisterUserResource(ModelResource):
             username = bundle.data['username'] 
             email = bundle.data['email']
             password = bundle.data['password']
-            phone_number = bundle.data['phone_number']
             fbook = bundle.data['fbook_user']
+            fbook_id = bundle.data.get('fbook_id',None)
             is_fbook = (True if fbook == 'yes' else False)
 
             #first, check if a user uses this email
@@ -472,9 +471,8 @@ class RegisterUserResource(ModelResource):
             #if passed all checks create user
             bundle.obj = User.objects.create_user(username, email, password)
             if is_fbook:
-                bundle.obj.userprofile.facebook_user = is_fbook
-            if phone_number:
-                bundle.obj.userprofile.phone_number = encode(PHONE_KEY,phone_number)
+                bundle.obj.userprofile.facebook_user = is_fbook2
+                bundle.obj.userprofile.facebook_id = fbook_id
 
             bundle.obj.userprofile.save()
 
