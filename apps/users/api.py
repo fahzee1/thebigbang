@@ -462,6 +462,8 @@ class RegisterUserResource(ModelResource):
         email = data.get('email')
         fbook_user = data.get('fbook_user')
         fbook_id = data.get('fbook_id', None)
+        first_name = data.get('first_name', None)
+        last_name = data.get('last_name', None)
         is_fbook = (True if fbook_user == 'yes' else False)
 
         try:
@@ -469,7 +471,9 @@ class RegisterUserResource(ModelResource):
         except User.DoesNotExist:
             user = User.objects.create(username=username,
                                        password=password,
-                                       email=email)
+                                       email=email,
+                                       first_name=first_name,
+                                       last_name=last_name)
             user.userprofile.facebook_user = fbook_user
             user.userprofile.facebook_id = fbook_id
             user.userprofile.save()
