@@ -265,15 +265,15 @@ class UserProfileResource(ModelResource):
         data = self.deserialize(request,
                                 request.body,   
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
+
+        REQUIRED_USER_FIELDS = ["username", "password"]
+        for field in REQUIRED_USER_FIELDS:
+            if field not in data:
+                raise CustomBadRequest(code=-10,
+                                      message="Must provide %s when logging in!" % field)
+
         username = data.get('username', None)
         password = data.get('password', None)
-        if not username:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide username when logging in!')
-
-        if not password:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide password when logging in!')
 
         user = authenticate(username=username, password=password)
         if user:
@@ -310,15 +310,14 @@ class UserProfileResource(ModelResource):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
         data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
+        REQUIRED_USER_FIELDS = ["username", "action"]
+        for field in REQUIRED_USER_FIELDS:
+            if field not in data:
+                raise CustomBadRequest(code=-10,
+                                      message="Must provide %s when updating settings!" % field)
+
         username = data.get('username',None)
         action = data.get('action',None)
-        if not username:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide username when updating settings!')
-
-        if not action:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide action when updating settings!')
 
         try:
             user = User.objects.get(username=username)
@@ -438,10 +437,47 @@ class RegisterUserResource(ModelResource):
         for field in REQUIRED_USER_FIELDS:
             if field not in bundle.data:
                 raise CustomBadRequest(code=-10, 
-                                    message="Must provide %s to register" % field,
-                                    my_error =True)
+                                    message="Must provide %s to register" % field)
 
         return bundle
+
+    def prepend_urls(self):
+        return [
+                url(r'^(?P<resource_name>%s)/facebook%s$' %
+                    (self._meta.resource_name, trailing_slash()),
+                    self.wrap_view('login_facebook'), name='api_login_facebook'),
+                ]
+
+
+    def login_facebook(self, request, **kwargs):
+        self.method_check(request, allowed=['post'])
+        data = self.deserialize(request, request.body , format=request.META.get('CONTENT_TYPE', 'application/json'))
+        REQUIRED_USER_FIELDS = ["username", "email", "password", "fbook_user"]
+        for field in REQUIRED_USER_FIELDS:
+            if field not in data:
+                raise CustomBadRequest(code=-10,
+                                      message="Must provide %s to register" % field)
+        username = data.get('username')
+        password = data.get('password')
+        email = data.get('email')
+        fbook_user = data.get('fbook_user')
+        fbook_id = data.get('fbook_id', None)
+        is_fbook = (True if fbook_user == 'yes' else False)
+
+        try:
+            user = User.objects.get(username=username, email=email)
+        except User.DoesNotExist:
+            user = User.objects.create(username=username,
+                                       password=password,
+                                       email=email)
+            user.userprofile.facebook_user = fbook_user
+            user.userprofile.facebook_id = fbook_id
+            user.userprofile.save()
+
+        return self.create_response(request, user.userprofile.return_json(login=True))
+
+
+
 
     def obj_create(self, bundle, request=None, **kwargs):
         try:
@@ -452,6 +488,9 @@ class RegisterUserResource(ModelResource):
             fbook_id = bundle.data.get('fbook_id',None)
             is_fbook = (True if fbook == 'yes' else False)
 
+            user = User.objects.filter(username=username, email=email)
+            if user:
+                return self.create_response
             #first, check if a user uses this email
             if User.objects.filter(email=email):
                 raise CustomBadRequest(code=-1, 
