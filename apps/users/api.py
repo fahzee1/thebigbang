@@ -477,8 +477,10 @@ class RegisterUserResource(ModelResource):
             user.userprofile.facebook_user = fbook_user
             user.userprofile.facebook_id = fbook_id
             user.userprofile.save()
-
-        return self.create_response(request, user.userprofile.return_json(login=True))
+        try:
+            return self.create_response(request, user.userprofile.return_json(login=True))
+        except:
+            traceback.print_exc()
 
 
 
