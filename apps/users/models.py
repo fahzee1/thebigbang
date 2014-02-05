@@ -58,6 +58,7 @@ class UserProfile(TimeStampedModel):
     device_token = models.CharField(default="",max_length=255, blank=True, null=True)
     privacy = models.IntegerField(default=0)
     sent_challenges = models.IntegerField(default=0)
+    played_challenges = models.IntegerField(default=0)
     facebook_id = models.IntegerField(blank=True, null=True)
 
 
@@ -91,6 +92,8 @@ class UserProfile(TimeStampedModel):
         profile_json['friend_requests'] = self.friend_requests
         profile_json['my_challenges'] = self.my_challenges
         profile_json['received_challenges'] = self.received_challenges
+        profile_json['api_key'] = self.user.api_key.key
+
         if self.phone_number:
             profile_json['phone_number'] = decode(PHONE_KEY, str(profile_json['phone_number']))
 
@@ -127,7 +130,8 @@ class UserProfile(TimeStampedModel):
         profile_json['friend_requests'] = self.friend_requests
         profile_json['my_challenges'] = self.my_challenges
         profile_json['received_challenges'] = self.received_challenges
-       
+        profile_json['api_key'] = self.user.api_key.key
+
         if login:
             profile_json['code'] = 1
             profile_json['message'] = 'Login was successful.'
@@ -160,7 +164,7 @@ class UserProfile(TimeStampedModel):
     @staticmethod
     def get_contact_friends(numbers=[]):
         """
-        Returns json of all friends matched by 
+        Returns json of all friends matched by
         phone_numbers
         """
         blob = {'contacts':[]}
@@ -208,7 +212,7 @@ class UserProfile(TimeStampedModel):
         Returns json of all challenges
         this user has sent
         """
-        
+
         my_list = []
         blob = {
             'code':1,
@@ -270,7 +274,7 @@ class UserProfile(TimeStampedModel):
                     }
                 }
         new_friends = Friends.objects.filter(user=self.user,created_on__gt=timestamp).select_related()
-        created_challenges = ChallengeResults.objects.filter(challenge__sender=self.user, 
+        created_challenges = ChallengeResults.objects.filter(challenge__sender=self.user,
                                                         player=self.user,created_on__gt=timestamp).select_related()
 
         if new_friends:
@@ -324,8 +328,8 @@ REGEX_VALID_PASSWORD = (
     ')'
     ## Minimum 5 characters
     '{' + str(MINIMUM_PASSWORD_LENGTH) + ',}$')
- 
- 
+
+
 def validate_password(password):
     if re.match(REGEX_VALID_PASSWORD, password):
         return True

@@ -26,7 +26,7 @@ class ChallengeValidation(Validation):
             errors['error'] = 'Must provide data to create challenge!'
             return errors
 
-        
+
 
         return errors
 
@@ -51,7 +51,7 @@ class ChallengeResource(ModelResource):
 
      Send challenge:
      POST to /api/v1/send
-    
+
     {
       "challenge_id":"id",
       "recipients":["user", "user2", "user3"],
@@ -68,7 +68,8 @@ class ChallengeResource(ModelResource):
       "username":"user",
       "challenge_id":"id",
       "success":"yes",
-    
+      "score":133
+
     }
 
     Will send media data as gzipped base64 data
@@ -106,23 +107,19 @@ class ChallengeResource(ModelResource):
     def send_results(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
-        data = self.deserialize(request, 
+        data = self.deserialize(request,
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
-        username = data.get('username', None)
-        challenge_id = data.get('challenge_id', None)
-        success = data.get('success', None)
-        if not username:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide username when sending challenge results!')
+        REQUIRED_USER_FIELDS = ["username", "challenge_id", "success", "score"]
+        for field in REQUIRED_USER_FIELDS:
+            if field not in data:
+                raise CustomBadRequest(code=-10,
+                                      message="Must provide %s to send challenge results" % field)
 
-        if not challenge_id:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide challenge id when sending challenge results!')
-
-        if not success:
-            raise CustomBadRequest(code=-10,
-                                   message='Must provide success when sending challenge results!')
+        username = data.get('username')
+        challenge_id = data.get('challenge_id')
+        success = data.get('success')
+        score = data.get('score')
 
         try:
             challenge = Challenge.objects.get(challenge_id=challenge_id)
@@ -136,7 +133,15 @@ class ChallengeResource(ModelResource):
             raise CustomBadRequest(code=-10,
                                    message="User doesnt exist!")
 
-        # did user win or lose challenge?  
+        try:
+            sender.userprofile.played_challenges += 1
+            sender.userprofile.score = score
+            sender.userprofile.save()
+        except:
+            raise CustomBadRequest(code=-10,
+                                   message="Error incrementing player challenges or incrementing score")
+
+        # did user win or lose challenge?
         success = (True if success == 'yes' else False)
         # create challenge results and return success
         try:
@@ -151,12 +156,12 @@ class ChallengeResource(ModelResource):
             raise CustomBadRequest(code=-10,
                                    message="Error creating challenge results!")
 
-    
+
 
     def get_blob(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
-        data = self.deserialize(request, 
+        data = self.deserialize(request,
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
         username = data.get('username', None)
@@ -185,12 +190,12 @@ class ChallengeResource(ModelResource):
     def send_challenge(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
-        data = self.deserialize(request, 
+        data = self.deserialize(request,
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
         username = data.get('username', None)
         challenge_id = data.get('challenge_id', None)
-        recipients = data.get('recipients', None) 
+        recipients = data.get('recipients', None)
         if not username:
             raise CustomBadRequest(code=-10,
                                    message='Must provide username when sending challenge!')
@@ -320,7 +325,7 @@ class ChallengeResource(ModelResource):
                 challenge_media=ContentFile(image_data,challenge_id+'.png')
                 )
             """
-           
+
             bundle.obj = Challenge.objects.create(
                 sender=creator,
                 name=name,
@@ -331,14 +336,14 @@ class ChallengeResource(ModelResource):
                 hint=hint,
                 media_data = media
                 )
-            
+
 
 
         except:
             raise CustomBadRequest(code=-10,
                                   message='Not sure what happened, but its your fault CJ!')
 
-        return bundle        
- 
+        return bundle
+
 
 
