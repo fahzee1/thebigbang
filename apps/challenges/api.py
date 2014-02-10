@@ -110,7 +110,7 @@ class ChallengeResource(ModelResource):
         data = self.deserialize(request,
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
-        REQUIRED_USER_FIELDS = ["username", "challenge_id", "success", "score"]
+        REQUIRED_USER_FIELDS = ["username", "challenge_id", "success"]
         for field in REQUIRED_USER_FIELDS:
             if field not in data:
                 raise CustomBadRequest(code=-10,
@@ -119,7 +119,7 @@ class ChallengeResource(ModelResource):
         username = data.get('username')
         challenge_id = data.get('challenge_id')
         success = data.get('success')
-        score = data.get('score')
+        score = data.get('score',None)
 
         try:
             challenge = Challenge.objects.get(challenge_id=challenge_id)
@@ -135,7 +135,8 @@ class ChallengeResource(ModelResource):
 
         try:
             sender.userprofile.played_challenges += 1
-            sender.userprofile.score = score
+            if score:
+                sender.userprofile.score = score
             sender.userprofile.save()
         except:
             raise CustomBadRequest(code=-10,
@@ -143,6 +144,7 @@ class ChallengeResource(ModelResource):
 
         # did user win or lose challenge?
         success = (True if success == 'yes' else False)
+
         # create challenge results and return success
         try:
             results = ChallengeResults.objects.create(
