@@ -95,12 +95,12 @@ class ChallengeResource(ModelResource):
 
     def prepend_urls(self):
         return [
-                url(r'^send%s$' %(trailing_slash()),
-                    self.wrap_view('send_challenge'), name='api_send'),
-                url(r'^blob%s$' %(trailing_slash()),
-                    self.wrap_view('get_blob'), name='api_blob'),
-                url(r'^results%s$' %(trailing_slash()),
-                    self.wrap_view('send_results'), name='api_results'),
+                url(r'^(?P<resource_name>%s)/send%s$' %(self._meta.resource_name,
+                    trailing_slash()),self.wrap_view('send_challenge'), name='api_send'),
+                url(r'^(?P<resource_name>%s)/blob%s$' %(self._meta.resource_name,
+                    trailing_slash()),self.wrap_view('get_blob'), name='api_blob'),
+                url(r'^(?P<resource_name>%s)/results%s$' %(self._meta.resource_name,
+                    trailing_slash()),self.wrap_view('send_results'), name='api_results'),
                 ]
 
 

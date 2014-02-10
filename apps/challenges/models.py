@@ -4,6 +4,7 @@ from tastypie.utils.timezone import now
 from django.contrib.auth.models import User
 from django.core.serializers.json import DjangoJSONEncoder
 import base64
+from django.core import serializers
 
 
 def get_upload_path(instance , filname):
@@ -44,12 +45,33 @@ class Challenge(TimeStampedModel):
 
 
     def spit_data(self):
+        blob = serializers.serialize('json',[self,self.sender])
+        blob_json = json.loads(blob)
+        challenge_json = blob_json[0]['fields']
+        user_json = blob_json[1]['fields']
+
+        try:
+            del user_json['is_active']
+            del user_json['is_superuser']
+            del user_json['is_staff']
+            del user_json['groups']
+            del user_json['user_permissions']
+            del user_json['password']
+        except KeyError:
+            pass
+
+        challenge_json['sender'] = user_json
+        challenge_json['code'] = 1
+        challenge_json['message'] = 'Challenge fetch was successful'
+
+        """
         blob = {'media':{
                 'media_type':self.media_type,
                 'data': base64.b64encode(self.media_data)
         }}
+        """
 
-        return json.dumps(blob)
+        return challenge_json
 
     spit_json = property(spit_data)
 
