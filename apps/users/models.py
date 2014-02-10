@@ -60,7 +60,8 @@ class UserProfile(TimeStampedModel):
     sent_challenges = models.IntegerField(default=0)
     played_challenges = models.IntegerField(default=0)
     facebook_id = models.IntegerField(blank=True, null=True)
-
+    is_deleted = models.BooleanField(default=False)
+    last_modified = models.DateTimeField(default=now,auto_now_add=True)
 
     def __unicode__(self):
         return self.user.username

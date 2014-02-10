@@ -20,13 +20,13 @@ from django.db import IntegrityError
 from exceptions import CustomBadRequest
 from django.contrib.auth.hashers import make_password, check_password, is_password_usable
 from utils import PHONE_KEY, encode, decode
-
+from tastypie.utils.timezone import now
 
 responder = {}
 
 
 class UserResource(ModelResource):
-    
+
     class Meta:
         queryset = User.objects.all()
         resource_name = 'user'
@@ -138,13 +138,13 @@ class UserProfileResource(ModelResource):
                     self.wrap_view('friends'), name='api_friends'),
                 ]
 
-            
+
 
 
     def friends(self, request, **kwargs):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
-        data = self.deserialize(request, 
+        data = self.deserialize(request,
                                 request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
         username = data.get('username', None)
@@ -255,7 +255,7 @@ class UserProfileResource(ModelResource):
 
             raise CustomBadRequest(code=-1,
                                    message="""
-                                          Action parameter should be either 'add', 
+                                          Action parameter should be either 'add',
                                           'delete', 'display', or 'getCF' """)
 
 
@@ -263,7 +263,7 @@ class UserProfileResource(ModelResource):
         self.method_check(request, allowed=['post'])
         self.is_authenticated(request)
         data = self.deserialize(request,
-                                request.body,   
+                                request.body,
                                 format=request.META.get('CONTENT_TYPE', 'application/json'))
 
         REQUIRED_USER_FIELDS = ["username", "password"]
@@ -285,10 +285,10 @@ class UserProfileResource(ModelResource):
                     return self.create_response(request,user.userprofile.__return_json(login=True))
 
             else:
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message='Inactive user')
         else:
-            raise CustomBadRequest(code=-1, 
+            raise CustomBadRequest(code=-1,
                                 message='Incorrect username or password')
 
 
@@ -327,11 +327,13 @@ class UserProfileResource(ModelResource):
 
         # each action param should sent content to update/edit
         new_content = data.get('content',None)
-        
+
         if action == 'updateEmail':
             user.email = new_content
+            user.userprofile.last_modified = now
             try:
                 user.save()
+                user.userprofile.save()
                 responder['success'] = 1
                 responder['message'] = 'Email updated'
                 return self.create_response(request,responder)
@@ -341,36 +343,40 @@ class UserProfileResource(ModelResource):
 
         if action == 'updateUsername':
             user.username = new_content
+            user.userprofile.last_modified = now
             try:
                 user.save()
+                user.userprofile.save()
                 responder['success'] = 1
                 responder['message'] = 'Username updated'
                 return self.create_response(request, responder)
             except:
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message='Failed to update username. Type new name and try again')
 
         # encode phone number using phone key
         if action == 'updatePhoneNumber':
             user.userprofile.phone_number = encode(PHONE_KEY,new_content)
+            user.userprofile.last_modified = now
             try:
                 user.userprofile.save()
                 responder['success'] = 1
                 responder['message'] = 'Phone number updated'
                 return self.create_response(request, responder)
             except:
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message='Failed to update phone number. Please try again')
 
         if action == 'updatePrivacy':
-            user.privacy = new_content
+            user.userprofile.privacy = new_content
+            user.userprofile.last_modified = now
             try:
-                user.save()
+                user.userprofile.save()
                 responder['success'] = 1
                 responder['message'] = 'Privacy updated'
                 return self.create_response(request, responder)
             except:
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message='Failed to update privacy. Please try again')
 
         # assert valid action param sent
@@ -379,8 +385,8 @@ class UserProfileResource(ModelResource):
            action != 'updateUsername' and \
            action != 'updatePhoneNumber':
            raise CustomBadRequest(code=-1,
-                                 message=""" 
-                                    Must proide either 'updateUsername', 
+                                 message="""
+                                    Must proide either 'updateUsername',
                                    'updatePrivacy',updateEmail' or 'updatePhoneNumber'
                                     when updating settings """)
 
@@ -402,12 +408,12 @@ class UserProfileResource(ModelResource):
 
 
 
-  
+
 
 
 class RegisterUserResource(ModelResource):
     """
-    creates a new user and returns http status 201 (code=1) if 
+    creates a new user and returns http status 201 (code=1) if
     successful, status 400 (code=-1) if not, and status 500 (code=-10)
     if error on our end. Check "message" in response to know exact error
 
@@ -430,13 +436,13 @@ class RegisterUserResource(ModelResource):
 
 
     def hydrate(self, bundle):
-        """ 
+        """
         Receive request data here.
         """
         REQUIRED_USER_FIELDS = ["username", "email", "password", "fbook_user"]
         for field in REQUIRED_USER_FIELDS:
             if field not in bundle.data:
-                raise CustomBadRequest(code=-10, 
+                raise CustomBadRequest(code=-10,
                                     message="Must provide %s to register" % field)
 
         return bundle
@@ -487,7 +493,7 @@ class RegisterUserResource(ModelResource):
 
     def obj_create(self, bundle, request=None, **kwargs):
         try:
-            username = bundle.data['username'] 
+            username = bundle.data['username']
             email = bundle.data['email']
             password = bundle.data['password']
             fbook = bundle.data['fbook_user']
@@ -499,12 +505,12 @@ class RegisterUserResource(ModelResource):
                 return self.create_response
             #first, check if a user uses this email
             if User.objects.filter(email=email):
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message="That email is already used.")
 
             #second, check if this username is taken
             if User.objects.filter(username=username):
-                raise CustomBadRequest(code=-1, 
+                raise CustomBadRequest(code=-1,
                                     message="That username is already taken")
 
             #third, check if the password is valid

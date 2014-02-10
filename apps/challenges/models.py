@@ -12,7 +12,7 @@ def get_upload_path(instance , filname):
         path = 'photos/%Y/%m/%d'
     if instance.media_type == 1:
         path = 'videos/%Y/%m/%d'
-    return path 
+    return path
 
 
 class TimeStampedModel(models.Model):
@@ -37,7 +37,7 @@ class Challenge(TimeStampedModel):
     answer = models.CharField(max_length=255, blank=False, null=False)
     hint = models.CharField(max_length=255, blank=True, null=True)
     active = models.BooleanField(default=True)
-
+    is_deleted = models.BooleanField(default=False)
 
     def __unicode__(self):
         return "Challenge: %d User: %s" % (self.id, self.sender.username)
@@ -69,8 +69,8 @@ class ChallengeResults(TimeStampedModel):
 
 
     def __unicode__(self):
-        return "%s played challenge '%s' by %s" %(self.player.username, 
-                                                  self.challenge.name, 
+        return "%s played challenge '%s' by %s" %(self.player.username,
+                                                  self.challenge.name,
                                                   self.challenge.sender.username)
 
 
