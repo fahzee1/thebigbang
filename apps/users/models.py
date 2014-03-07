@@ -265,6 +265,31 @@ class UserProfile(TimeStampedModel):
 
     received_challenges = property(received_challenges)
 
+    def latest_challenges(self, timestamp):
+        """
+        Returns json of all challenges
+        this user has received
+        """
+        my_list = []
+        challenges = ChallengeResults.objects.filter(player=self.user, created_on__gte=timestamp).select_related()
+        for challenge in challenges:
+            blob = {
+           'challenge':{
+              'id': challenge.challenge.challenge_id,
+              'media_type': challenge.challenge.media_type,
+              'challenge_type': challenge.challenge.challenge_type,
+              'challenge_created': challenge.challenge.created_on,
+              'name': challenge.challenge.name,
+              'result':{
+                     'success': challenge.success,
+                     'sender': challenge.challenge.sender.username}
+                          }
+                }
+            my_list.append(blob)
+
+        return json.dumps(my_list, cls=DjangoJSONEncoder)
+
+
     """
     def updates(self, timestamp):
         blob = {'new_friends':[],

@@ -99,6 +99,8 @@ class ChallengeResource(ModelResource):
                     trailing_slash()),self.wrap_view('send_challenge'), name='api_send'),
                 url(r'^(?P<resource_name>%s)/blob%s$' %(self._meta.resource_name,
                     trailing_slash()),self.wrap_view('get_blob'), name='api_blob'),
+                url(r'^(?P<resource_name>%s)/recents%s$' %(self._meta.resource_name,
+                    trailing_slash()),self.wrap_view('get_recents'), name='api_recents'),
                 url(r'^(?P<resource_name>%s)/results%s$' %(self._meta.resource_name,
                     trailing_slash()),self.wrap_view('send_results'), name='api_results'),
                 ]
@@ -157,6 +159,22 @@ class ChallengeResource(ModelResource):
         except:
             raise CustomBadRequest(code=-10,
                                    message="Error creating challenge results!")
+
+
+    def get_recents(self, request, **kwargs):
+        self.method_check(request, allowed=['post'])
+        self.is_authenticated(request)
+        data = self.deserialize(request,
+                                request.body,
+                                format=request.META.get('CONTENT_TYPE', 'application/json'))
+        REQUIRED_FIELDS = ['username', 'timestamp']
+        for field in REQUIRED_FIELDS:
+            if field not in data:
+                raise CustomBadRequest(-10,
+                                        'Must provide %s when fetching challenges' % field)
+        username = data.get('username', None)
+        timestamp = data.get('timestamp', None)
+
 
 
 
